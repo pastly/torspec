@@ -136,18 +136,19 @@ The payload of each MEASURE cell consists of:
 
 The measure commands are:
 
-  0 -- MSM_BEGIN     [forward]
-  1 -- MSM_CHALLENGE [backward]
-  2 -- MSM_RESPONSE  [forward]
-  3 -- MSM_ECHO      [forward and backward]
-  4 -- MSM_BG        [backward]
+  0 -- MSM_PARAMS    [forward]
+  1 -- MSM_PARAMS_OK [backward]
+  2 -- MSM_ECHO      [forward and backward]
+  3 -- MSM_BG        [backward]
+  4 -- MSM_ERR       [forward and backward]
 
 [XXX use TLS client certs instead of shitty home-grown thing]
 
 Forward cells are sent from the Tor measurement client to the relay. Backward
 cells are sent from the relay to the Tor measurement client.
 
-BEGIN, CHALLENGE, RESPONSE, and BG cells are never encrypted by either party.
+The only cell type that is sometimes encrypted is MSM_ECHO; all other types
+are never encrypted.
 
 The relay "decrypts" ECHO cells before sending them back to the measurer; this
 mirrors the way relays decrypt/encrypt RELAY_DATA cells in order to induce
@@ -159,48 +160,35 @@ incoming cell matches.
 
 X.X Pre-Measurement Handshaking/Starting a Measurement
 
-Measurers start connecting to the target relay and each sends it a MSM_BEGIN
-cell. If the target is unwilling to be measured, it drops the cell and closes
-the connection. Otherwise it checks that the MSM_BEGIN cell indicates that the
-measurer is probably allowed to perform a measurement. Initially, this will
-always be true.
+Measurers start connecting to the target relay and each sends it a MSM_PARAMS
+cell. If the target is unwilling to be measured at this time, it responds with
+an error cell and closes the connection.  Otherwise it checks that the
+MSM_PARAMS cell indicates that the measurer is probably allowed to perform a
+measurement and that the parameters of the measurement are acceptable (e.g.
+the length isn't too long, the indicated relay identity is its own, etc.).
+Initially, this will always be true. If the target is happy, it sends a
+MSM_PARAMS_OK, otherwise it sends a MSM_ERR and closes the connection.
 
-The target sends back a MSM_CHALLENGE containing a nonce. Beyond the initial
-implementation, the measurer will be expected to sign it and send back the
-signed message in a MSM_RESPONSE, thus demonstrating active possession of its
-identity key.  For now, the measurer will send back a MSM_RESPONSE that the
-target will always accept.
+Upon receiving a MSM_PARAMS_OK from the target, the measurer will open the
+remaining sockets with the target. If it receives a MSM_ERR, it reports the
+error to the coordinator and considers the measurement a failure.
 
-The MSM_BEGIN cell contains at least:
-
-  - the measurement duration (just the actual measurement period, not
-    including the pre-measurement handshake time)
-  - whether or not this connection is to be used for background traffic
-    reports (MSM_BG cells) instead of MSM_ECHO traffic
-
-The payload of MSM_BEGIN cells [XXX crypto stuff needs to be added]:
+The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
   - num_socks    [2 bytes]
   - msm_duration [1 byte]
+  - bg_conn      [1 byte]
 
 num_socks is the total number of sockets this measurer will open with the
 target for this measurement. msm_duration is the duration, in seconds, that
-the actual measurement will last. [XXX also except to need: identity
-(RSA/ed25519) of the relay, identity of the measurer, chain of sigs all the
-way to bwauth, the current time ...]
+the actual measurement will last.  bg_conn is a flag indicating whether or not
+this connection is to be used for background traffic reports (MSM_BG cells)
+instead of MSM_ECHO traffic.
 
-The payload of MSM_CHALLENGE cells [XXX more?]:
+MSM_PARAMS_OK has no payload: it's just padding bytes to make the cell 514
+bytes long.
 
-  - nonce [4 bytes]
-
-The payload of MSM_RESPONSE cells [XXX more?]:
-
-  - nonce                       [4 bytes]
-  - signature over other fields [?? bytes]
-
-The nonce is the same as the one sent in the MSM_CHALLENGE.
-
-The payload of MSM_ECHO is:
+The payload of MSM_ECHO cells:
 
   - arbitrary bytes [max to fill up 514 byte cell]
 
@@ -208,7 +196,19 @@ The payload of MSM_ECHO is:
 it will be discovered that it will be impossible to allow the measurer to skip
 encryption of most cells while requiring the relay to decrypt all cells]
 
+The payload of MSM_ERR cells:
 
+  - err_code [1 byte]
+  - err_str  [possibly zero-len null-terminated string]
+
+The error code is one of:
+
+  [... XXX TODO ...]
+  255 -- OTHER
+
+The error string is optional in all cases. It isn't present if the first byte
+of err_str is null, otherwise it is present. It ends at the first null byte or
+the end of the cell, whichever comes first.
 
 X.X Measurement Mode
 
