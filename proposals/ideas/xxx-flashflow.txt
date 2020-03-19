@@ -288,7 +288,7 @@ X.X.X.X Motivation
 
 A malicious relay may want to skip decryption of measurement cells to save CPU
 cycles and obtain a higher capacity estimate. More generally, it could
-generate fake, measurement cells locally, ignore the measurement traffic it is
+generate fake measurement cells locally, ignore the measurement traffic it is
 receiving, and flood the measurer with more traffic that it (the measurer) is
 even sending.
 
