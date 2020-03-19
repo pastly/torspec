@@ -1,0 +1,796 @@
+Filename: xxx-flashflow.txt
+Title: Flashflow: A Secure Speed Test for Tor
+Author: Matthew Traudt, Rob Jansen, Aaron Johnson
+Created: __________
+Status: Draft
+
+Overview:
+
+X. Introduction
+
+FlashFlow is a new distributed bandwidth measurement system for Tor that
+consists of a single authority node instructing one or more measurement nodes
+when and how to measure Tor relays. A measurement consists of the following
+steps:
+
+  X. The measurement nodes demonstrate to the target relay permission to
+     perform measurements
+  X. The measurement nodes open many sockets to the target relay and create a
+     one-hop circuit to the target relay on each one
+  X. For 30 seconds the measurement nodes send measurement cells to the
+     target relay and verify that the cells echoed back match the ones sent
+  X. For every second during the measurement, the measurement nodes report to
+     the authority node how much traffic was echoed back.
+     The target relay also reports the amount of per-second background
+     (non-measurement) traffic.
+  X. The authority node sums the per-second reported throughputs into 30 sums
+     (one for each second) and calculates the median. This is estimated
+     capacity of the relay.
+
+FlashFlow performs a measurement of every relay according to a schedule
+described later in this document. Periodically it produces a v3bw file
+suitable for consumption by a Tor directory authority to make it a voting
+"bandwidth authority."
+
+Eventually FlashFlow could replace the existing Torflow/Simple Bandwidth
+Scanner system. Tor can't get there overnight. Thus in addition to laying out
+how FlashFlow works, this document describes an initial deployment plan that
+will provide Tor with data not only valuable for informing future transition
+decisions but also for network health and monitoring.
+
+This document starts with a series of design/specification sections describing
+how FlashFlow shall be implemented. After that, the first section describing
+the initial deployment plan is [XXX]. Finally, the implementation strategy
+(i.e. where is all this code going to go?) is described in [XXX].
+
+
+X. Deployment Stages
+
+FlashFlow's deployment shall be broken up into three stages.
+
+  1. Minimally Viable Product (MVP)
+  2. MVP + authentication chain
+  3. MVP + results used by Simple Bandwidth Scanner
+
+
+X. Minimally Viable Product
+
+The FlashFlow MVP will implement the core measurement mechanics in little-t
+tor:
+
+  - New torrc options/consensus parameters
+  - New cell types
+  - Pre-measurement handshaking (with authentication reduced to stub methods
+    that always indicate successful verification)
+  - Measurment mode, during which the relay will echo traffic with measurers,
+    report the amount of background traffic, and limit the amount of
+    background traffic
+
+The MVP will also consist of a separate codebase for the FlashFlow measurement
+system. 
+
+X.X Parameters
+
+The MVP will require some consensus parameters/torrc options. Each has some
+default value if nothing is specified; the consensus parameter overrides this
+default value; the torrc option overrides both.
+
+FFMeasurementsAllowed: In lieu of a proper chain of authentication that gives
+FF measurers permission to perform measurements, this allows/disallows this
+relay to be measured by anyone. Possible values: 0, 1. Default: 0 (disallowed).
+
+FFSecondsBetweenMeasurements: the amount of time, in seconds, that must pass
+after a FF deployment's measurement of a relay before that relay should allow
+another measurement by the same FF deployment. It doesn't matter if the
+measurement was successful. If there are multiple deployments, relays track
+the time since the last measurement by each deployment separately. Possible
+values in the range [0 seconds, 7 days] inclusive. Default: 1 day.
+
+FFBackgroundTrafficPercent: the maximum amount of regular non-measurement
+traffic a relay should handle while being measured, as a percent of total
+traffic (measurement + non-measurement). For example, if this is 10 and if the
+relay has handled 9000 bytes of measurement traffic recently, then it shall
+limit itself to no more than 1000 bytes of non-measurement traffic this
+scheduling round. This parameter is a trade off between having to limit
+background traffic and limiting how much a relay can inflate its result by
+handling no background traffic but reporting that it has done so.  Possible
+values are in the range [0, 99] inclusive. Default: 25 (a maximum inflation
+factor of 1.33).
+
+FFMaxMeasurementDuration: the maximum amount of time, in seconds, that is
+allowed to pass from the moment the relay is notified that a measurement will
+begin soon and the end of the measurement. If this amount of time passes, the
+relay shall close all measurement connections and exit its measurement mode.
+Note this duration includes handshake time, thus it necessarily is larger than
+the expected actual measurement duration.  Possible values are in the range
+[10, 120] inclusive. Default: 45.
+
+
+X.X New Cell Types
+
+FlashFlow will introduce a new cell command MEAUSRE.
+
+The payload of each MEASURE cell consists of:
+
+  Measure command [1 byte]
+  Length          [2 bytes]
+  Data            [Length-3 bytes]
+
+The measure commands are:
+
+  0 -- MSM_BEGIN     [forward]
+  1 -- MSM_CHALLENGE [backward]
+  2 -- MSM_RESPONSE  [forward]
+  3 -- MSM_ECHO      [forward and backward]
+  4 -- MSM_BG        [backward]
+
+Forward cells are sent from the Tor measurement client to the relay. Backward
+cells are sent from the relay to the Tor measurement client.
+
+BEGIN, CHALLENGE, RESPONSE, and BG cells are never encrypted by either party.
+
+The relay "decrypts" ECHO cells before sending them back to the measurer; this
+mirrors the way relays decrypt/encrypt RELAY_DATA cells in order to induce
+realistic cryptographic CPU load. The measurer usually skips encrypting ECHO
+cells to reduce its own CPU load; however, to verify the relay is actually
+correctly decrypting all cells, the measurer will choose random outgoing
+cells, encrypt them, remember the ciphertext, and verify the corresponding
+incoming cell matches. 
+
+X.X Pre-Measurement Handshaking/Starting a Measurement
+
+Measurers start connecting to the target relay and each sends it a MSM_BEGIN
+cell. If the target is unwilling to be measured, it drops the cell and closes
+the connection. Otherwise it checks that the MSM_BEGIN cell indicates that the
+measurer is probably allowed to perform a measurement. For the MVP, this will
+always be true.
+
+The target sends back a MSM_CHALLENGE containing a nonce. Beyond the MVP, the
+measurer will be expected to sign it and send back the signed message in a
+MSM_RESPONSE, thus demonstrating active possession of its identity key.
+For now, the measurer will send back a MSM_RESPONSE that the target will
+always accept.
+
+The MSM_BEGIN cell contains at least:
+
+  - the measurement duration (just the actual measurement period, not
+    including the pre-measurement handshake time)
+  - whether or not this connection is to be used for background traffic
+    reports (MSM_BG cells) instead of MSM_ECHO traffic
+
+The payload of MSM_BEGIN cells [XXX crypto stuff needs to be added]:
+
+  - num_socks    [2 bytes]
+  - msm_duration [1 byte]
+
+num_socks is the total number of sockets this measurer will open with the
+target for this measurement. msm_duration is the duration, in seconds, that
+the actual measurement will last. [XXX also except to need: identity
+(RSA/ed25519) of the relay, identity of the measurer, chain of sigs all the
+way to bwauth, the current time ...]
+
+The payload of MSM_CHALLENGE cells [XXX more?]:
+
+  - nonce [4 bytes]
+
+The payload of MSM_RESPONSE cells [XXX more?]:
+
+  - nonce                       [4 bytes]
+  - signature over other fields [?? bytes]
+
+The nonce is the same as the one sent in the MSM_CHALLENGE.
+
+The payload of MSM_ECHO is:
+
+  - arbitrary bytes [max to fill up 514 byte cell]
+
+[XXX it's possible while implementing the verification of MSM_ECHO cells that
+it will be discovered that it will be impossible to allow the measurer to skip
+encryption of most cells while requiring the relay to decrypt all cells]
+
+
+
+X.X Measurement Mode
+
+The relay considers the measurement to have started the moment it receives the
+first MSM_ECHO cell from any measurer. At this point, the relay
+
+  - starts a repeating 1s timer on which it will report the amount of
+    background traffic on the appropriate connection
+  - enters "measurement mode" and limits the amount of background traffic it
+    handles according to the torrc option/consensus parameter
+
+The relay decrypts and echos back all MSM_ECHO cells it receives on
+measurement connections until it has reported its amount of background traffic
+the same number of times as there are seconds in the measurement (e.g. 30
+per-second reports for a 30 second measurement). After sending the last
+MSM_BG cell, the relay drops all buffered MSM_ECHO cells, closes all
+measurement connections, and exits measurement mode. It will not allow itself
+to be measured again for a period of time governed by the torrc
+option/consensus parameter.
+
+
+X.X FlashFlow code
+
+The FF coordinator and measurer code will reside in a FlashFlow repository
+separate from little-t tor.
+
+The coordinator is responsible for scheduling measurements, aggregating
+results, and producing v3bw files. It needs an accompanying Tor process so
+that it has access to consensuses as they come in.
+
+The measurers take commands from the coordinator, connect to target relays
+with many sockets, send them traffic, and verify the received traffic is the
+same as what was sent. Measurers either need to link against tor and call
+internal, undocumented, the-public-isnt-supposed-to-use-this-directly APIs
+(e.g. calling append_cell_to_circuit_queue() directly instead of using the
+limited but public interface exposed in feature/api/tor_api.c and
+tools/tor_runner.c), or tor needs some of this functionality added to it so
+that it can do some of these things itself when given commands via the control
+port.
+
+[XXX for now I'll assume that an optional little-t tor control port module
+housing a lot of this code is the best idea.]
+
+
+
+--------------------------------------------------------------------------------
+Additional draft material that may still have salvageable parts
+--------------------------------------------------------------------------------
+
+
+
+X. Terminology
+
+Torflow: Torflow and Simple Bandwidth Scanner
+
+FF: FlashFlow
+
+FF deployment: One FF coordinator and its set of measurers. It's possible
+there is more than one FF deployement: e.g. if each bwauth wants to run their
+own.
+
+Coordinator: the authority node in a FF deployment. It instructs a set
+of FF measurers how/when to perform measurements.
+
+Measurer: The measurement nodes in a FF deployment. They open many sockets to
+the target Tor relay, send it traffic, and verify the traffic they get back is
+the same as they sent. Each second they report to the coordinator the amount
+of echoed traffic received from the target.
+
+Target: The Tor relay getting measured.
+
+Throughput: An amount of traffic that an application or a segment of the
+network stack (e.g. TCP) has been measured to have forwarded (i.e. received
+and then sent).
+
+Capacity: The maximum throughput an application or network segment can handle.
+
+dirauth: Tor directory authority
+
+bwauth: Tor directory authority that also votes about relay weights
+
+
+X. Initial Deployment
+
+NRL will host a FlashFlow Minimally Viable Product (MVP). It will consist of a
+FF coordinator and a single FF measurer on a single 1 Gbit machine. Data
+produced by this FF MVP will be made available, including v3bw files for any
+bwauth that wishes to use them for any reason.
+
+
+
+X. Parameters
+
+FFSecondsBetweenMeasurements: the amount of time, in seconds, that must pass
+after a FF deployment's measurement of a relay before that relay should allow
+another measurement by the same FF deployment. It doesn't matter if the
+measurement was successful. If there are multiple deployments, relays track
+the time since the last measurement by each deployment separately.  This is a
+consensus parameter with an overriding torrc option. It defaults to 1 day if
+neither is specified.
+
+FFBackgroundTrafficPercent: the maximum amount of regular non-measurement
+traffic a relay should handle while being measured, as a percent of total
+traffic (measurement + non-measurement). For example, if this is 10 and if the
+relay has handled 9000 bytes of measurement traffic recently, then it shall
+limit itself to no more than 1000 bytes of non-measurement traffic this
+scheduling round. This parameter is a trade off between having to limit
+background traffic and limiting how much a relay can inflate its result (by
+handling no background traffic but reporting that it has done so).  Valid
+values are between 0 and 99 inclusive. It defaults to 25, which results in a
+maximum inflation factor of 1.33.
+
+
+
+
+
+
+
+
+
+
+
+
+
+X. Design: Measurement
+
+The pre-measurement phase begins as the coordinator tells the measurer(s) to
+start handshaking with the target. If this phase lasts 10 seconds without
+transitioning into the measurement phase, the measurement is considered a
+failure. In the positive case, the pre-measurement phase ends when the last
+measurer notifies the coordinator that it has finished handshaking with the
+target and has opened all sockets.
+
+The coordinator then tells all measurers to begin measurement at the same
+time. Measurers start flooding the target relay with echo cells on all
+measurement sockets. The relay reads the cells, decrypts them, and sends them
+back. The measurer verify that the cells it receives are the same as it sent
+and reports to the coordinator every second how much traffic it has received
+from the target.
+
+
+
+
+X. Design: Cell Types
+
+Measurers need to communicate with relays directly, thus they need some cell
+types to do so.
+
+FF_MSM_INIT: each measurer sends this to the target on one socket to signal
+that a measurement is about to begin. It contains the msm-cred etc.
+
+FF_MSM_CHAL: the target responds to FF_MSM_INIT with a challenge to prove the
+measurer is in possession of the correct public key
+
+FF_MSM_RESP: the measurer sends this in response to the challenge on each
+measurement socket (the original one, and the n-1 others that it has just
+opened).
+
+FF_MSM_ECHO: the actual measurement traffic. Measurers send these to the
+target, the target decrypts them and sends them back.
+
+FF_MSM_BG: target relay uses this to report (XXX to whom?) how much background
+traffic it saw in the last second
+
+X. Implementation
+
+Complete FlashFlow implementation consists of XXX logical sets of code.
+
+  X. Relay support for verification of FF msm-creds and echoing of traffic.
+     This will be done in C Tor.
+  X. Bwauth support for the creation of coord-creds. This will be done in C
+     Tor and in the existing dirauth modules.
+  X. A new Tor control port module for FF measurers written in either C or
+     Rust. This is for communication with the FF coordinator and doing
+     what it says (e.g. telling the rest of C Tor to build circuits to a
+     target relay).
+  X. A separate Rust repository for the FF coordinator.
+
+Prioritized for deployment are these patches:
+
+- Tor relay verification of FF credentials and echoing of traffic
+
+Even before the rest of FlashFlow is finished getting implemented, it's
+important to get support for these features implemented and out there so
+relays start upgrading to versions of Tor that support getting measured.
+
+X. Background
+
+Some Tor directory authorities run either Torflow or Simple Bandwidth Scanner
+(hereafter jointly abbreviated "Torflow") to measure Tor relays.  Periodically
+Torflow will collect its recent results, adjust them, and publish a v3bw file
+for its dirauth to use in its next consensus vote. The goal of this process is
+to produce relay weights that result in the same average circuit performance
+no matter what path through Tor is chosen. Torflow's designers do not assume
+accurately measuring a relay's bandwidth capacity is enough to achieve this
+goal. 
+
+Torflow has been shown to be insecure [0,1,2]. It's difficult to run and has
+really old dependencies [3]. There is little interest in maintaining Torflow's
+code now, nor has there been for years. Simple Bandwidth Scanner was the "band
+aide" solution to this with the goal of having easier to understand and
+maintain code while producing similar results as Torflow. It was never meant
+to be *the* long term solution; it was meant to hold Tor over while "NRL
+people" work on "the real solution." Here it is.
+
+X. Rapid side-by-side high-level comparison
+
+Torflow takes 2 days to measure the entire network and generate a v3bw file
+from scratch. Flashflow takes 5 hours.
+
+Anecdotally, Torflow can take a day or more to measure a new relay. Flashflow
+measures relays it hasn't seen since its last full measurement as soon as it
+learns about them, i.e. every new consensus. Under Flashflow, new relays are
+measured accurately within an hour and the resulting weights used immediately
+in the next consensus (see SEC_IMMEDIATE_WEIGHT).
+
+Both Torflow and Flashflow generate v3bw files every hour. Torflow's may
+not change every hour if it hasn't completed a slice (i.e. a partial network
+scan) in the last hour. Flashflow's changes every hour to reflect the
+absolute latest state of the network.
+
+Torflow allows malicious relays to inflate their weight by a factor of XXX.
+Flashflow allows a relay to inflate its weight by a chosen upper bound. With
+our chosen parameters (see [XXX]), that inflation factor is XXX. See also XXX
+about multiple relays on the same host.
+
+X. Security considerations
+
+X.X Accurate weights for new relays [SEC_IMMEDIATE_WEIGHT]
+
+An attacker can spin up new relays, get measured at a high capacity, and
+attract large amounts of client traffic all within a few hours with naive
+Flashflow. This is too fast for network monitors (especially human ones) to
+react and, if necessary, take action.
+
+XXX Option 1
+
+We propose a ramp up period for new relays. The Flashflow capacity estimate
+for a new relay is multiplied by the factor `f = X/(24*30)` where `X` is the
+number of consensuses in which the relay was present in the last 30 days.
+Thus a new 1000 Mbit/s relay would first be capped to `1000 * 1/(24*30) =
+1.39` Mbit/s of trusted capacity initially, `24/(24*30) = 33.3` Mbit/s of
+trusted capacity after one day, etc. These "trust-capped capacities" are then
+used when calculating weights for each relay.
+
+XXX Option 2
+
+We propose a maximum trustworthy increase in relay capacity.
+
+All measured capacities of 10 Mbit/s or less are considered trusted regardless
+of the age or the relay. If a relay's very first measured capacity is more
+than 10 Mbit/s, it is capped to 10 Mbit/s. From then on, the maximum its
+trusted capacity can increase per consensus is `0.1/24`, or approximately 10%
+per day.
+
+Consider a new relay capable of 1000 Mbit/s. Assume FlashFlow always measures
+it it accurately at this capacity. Upon joining the network (the first time it
+is measured) its trusted capacity it capped to just 10 Mbit/s. A day later (24
+consensuses), its trusted capacity increases to approximately `10 * 1.1 = 11`
+Mbit/s. A day later, it increased to approximately `11 * 1.1 = 12.1` Mbit/s.
+And so on.
+
+In general:
+
+    trusted_cap = min[measured_cap, prev_trusted_cap * 1.1^(1/24)]
+
+XXX End options
+
+There is a trade off between (1) quickly having and using accurate
+measurements for high-capacity relays and (2) mitigating the speed with which
+an adversary can attract traffic. On one side we have the problem that an
+adversary could, for example, all at once contribute so much exit capacity
+that they attract 50% of Tor exit traffic after only an hour or two and do bad
+things. On the other side, we have the problem of continuing to disappoint
+relay operators at low initial usage on high capacity relays.
+
+[pastly: I argue we err on the side of caution and disappointing relay
+operators.  At least with FlashFlow weights and this ramp up strategy we will
+have a and concrete easy-to-understand reason for low initial usage unlike
+the current "uhh well torflow takes a while and uhh it's complicated and
+depends on lots of factors outside of your control."]
+
+---
+
+Un-cited resources
+
+https://gitweb.torproject.org/torflow.git/tree/NetworkScanners/BwAuthority/README.BwAuthorities
+
+---
+
+Citations
+
+[0] K.Bauer,D.McCoy,D.Grunwald,T.Kohno,andD.Sicker. Low-resource Routing
+Attacks Against Tor. In Workshop on Privacy in the Electronic Society (WPES),
+2007.
+
+[1] A.Johnson,R.Jansen,N.Hopper,A.Segal,andP.Syverson. PeerFlow: Secure Load
+Balancing in Tor. Proceedings on Pri- vacy Enhancing Technologies (PoPETs),
+2017(2), April 2017.
+
+[2] F. Thill. Hidden Service Tracking Detection and Bandwidth Cheating in Tor
+Anonymity Network. Master’s thesis, Univ. Luxembourg, 2014.
+
+[3] https://trac.torproject.org/projects/tor/wiki/org/meetings/2018Rome/Notes/BandwidthAuthorityRequirements
+
+
+
+X. Design: Authentication 
+
+The FF coordinator maintains a long term ed25519 identity key. It periodically
+obtains a signed message from a bwauth that indicates it has permission to
+perform measurements for a short time into the future. This is the
+coordinator credential, or coord-cred. The coord-cred contains:
+
+  X. The public key of the coordinator
+  X. This credential's validity start and end time
+
+[XXX: how exactly is the coord-cred obtained from the bwauth?]
+[XXX: how long is it valid for? A couple hours? Balance between allowing for
+minor clock drift at relays and short validity periods.]
+
+The FF measurers also maintain long term ed25519 identity keys, the public
+parts of which the coordinator must know.
+
+When starting a measurement, the coordinator signs a message for each
+measurer called the msm-cred. It has the following contents:
+
+  X. The coord-cred
+  X. The public key of the measurer
+  X. The number of sockets the measurer shall open with the target relay
+  X. The BandwidthRate to which the measurer shall limit itself
+  X. The current time
+  X. The target relay's fingerprint
+  X. The expected duration of the measurement
+
+The measurer connects to the target with a single connection, signs its
+msm-cred, and provides it to the target.  Thus the target can observe:
+
+  X. A dirauth it trusts gave permission to a coord to orchestrate a
+     measurement (via the coord-cred)
+  X. The same coord has instructed a measurer to be a part of the
+     measurement with some parameters (via the msm-cred)
+  X. The measurer with which it is communicating is the one instructed to
+     help perform this measurement (via the fact the public key that signing
+     the msm-cred is listed in the msm-cred itself?? Nooooo)
+
+[XXX: what is the actual on-the-wire format of these messages?]
+
+[XXX With what's written, the target has no way of knowing that the measurer
+is in active possession of the correct public key. My idea here is for the
+target to give the measurer a nonce in response to the msm-cred. The measurer
+would then sign the nonce and send this as the opening message on the n-1
+remaining sockets]
+
+If a signature doesn't check out or a parameter doesn't seem right (e.g. wrong
+fingerprint, the time in the msm-cred isn't recent enough), the target shall
+close the connection(s).
+
+If the target has too recently been measured (successfully or otherwise) by
+this FF deployement (as inferred from coordinator's identity) and according to
+the FFSecondsBetweenMeasurements parameter, then the target shall close the
+connection(s).
+
+
+
+
+X. Design: State Machine
+
+The measurement of a relay requires many parties to maintain state about what
+stage of the measurement they are in currently. This section outlines the
+state machines for the three party types: the FF coordinator, FF measurer, and
+the target relay.
+
+X.X State Machine: FF Coordinator
+
+  Initial: IDLE
+
+  The coord decides it is time to perform a new measurment. Assume it has a
+  valid coord-cred.
+
+  The coord picks measurers with sufficient combined capacity to perform the
+  measurement.
+
+  The coord connects to the measurers, transition:
+
+  IDLE -> CONNECTING_TO_MSM
+
+  Once connections are made, transition:
+  
+  CONNECTING_TO_MSM -> CONNECTED_TO_MSM
+  
+  If for whatever reason the coord cannot connect to the measurers, transition:
+  
+  CONNECTING_TO_MSM -> FAILURE
+
+  The coord was successful in connecting to the measurers. It signs msm-creds
+  and sends them to each measurer, transition:
+
+  CONNECTED_TO_MSM -> MSM_CONNECTING
+
+  The coord waits for all measurers to report that they've successfully
+  opened all sockets with the target. Once all have indicated success,
+  transition:
+
+  MSM_CONNECTING -> MSM_CONNECTED
+
+  If any measurer indicates failure or neglects to make any indication before
+  a configured timeout, transition:
+
+  MSM_CONNECTING -> FAILURE
+
+  The coord has received indication from all measurers that they were
+  successful in connecting to the target. The coord tells them all at once to
+  begin measurement, transition:
+
+  MSM_CONNECTED -> MEASURING
+
+  For slightly more than the configured measurement duration (e.g. 5s more
+  than 30s) the coord waits and receives per-second results from every
+  measurer. It records the results as they come in. It is not a failure for a
+  measurer to delay sending per-second results, to only send results for every
+  other second, to send no results at all, or the disconnect from the coord.
+  There is no failure case: the measurement will last, using the running
+  example, at minimum 30s and at maximum 35s.
+
+  Once either (1) the coord gets at least the correct number of results from
+  all measurers (e.g. 30 results for a 30s measurement), or (2) the full e.g.
+  35s have passed, transition:
+
+  MEASURING -> FINISHED
+
+  The coordinator disconnects from all measurers, transition:
+
+  FINISHED -> IDLE
+
+  If at any time the coord enters the failure state, it informs all connected
+  measurers to consider the existing measurement (if any) as a failure and to
+  return to their idle state. Then transition:
+
+  FAILURE -> IDLE
+
+X.X State Machine: FF Measurer
+
+  Initial: IDLE
+
+  The measurer receives an open connection from its coord. It receives a
+  coord-cred.  It verifies the cred. If the cred doesn't verify or doesn't
+  "seem right," then it closes the connection, indicates to the coord failure.
+  Otherwise the measurer starts its pre-measurement process with the relay,
+  transition:
+
+  IDLE -> CONNECTING_TO_TARGET
+
+  A timeout timer is started.
+
+  The measurer opens a single socket to the target. If it cannot connect to
+  the target before the timeout, transition:
+
+  CONNECTING_TO_TARGET -> FAILURE
+
+  Upon successful connection, transition:
+
+  CONNECTING_TO_TARGET -> CONNECTED_TO_TARGET
+
+  The measurer signs its msm-cred and sends it to the target, transition:
+
+  CONNECTED_TO_TARGET -> CRED_SENT
+
+  A timeout timer is started.
+
+  If the target closes the connection or does not respond before the timeout,
+  transition:
+
+  CRED_SENT -> FAILURE
+
+  The target responds with a challenge, transition:
+
+  CRED_SENT -> CHALLENGE_RECV
+  
+  The measurer signs the challenge, transition:
+
+  CHALLENGE_RECV -> SOCKS_OPENING
+
+  A timer is started.
+
+  The measurer sends the signed challenge to the target on the existing
+  socket.  It also attempts to open all additional sockets and sends the
+  signed challenge on all of them.
+
+  If all sockets are opened and cells sent before the timer expires,
+  transition to next positive state.
+
+  If at least one socket is still open when the timer expires, transition to
+  the next positive state.
+
+  If no sockets are open when the timer expires, transition:
+
+  SOCKS_OPENING -> FAILURE
+
+  Else measurer was successful enough, transition:
+
+  SOCKS_OPENING -> WAITING_TO_START
+
+  A timeout timer is started.
+
+  If the coord indicates failure, all sockets with the target close, or
+  the timeout is reached, transition:
+
+  WAITING_TO_START -> FAILURE
+
+  The coord sends the start command, transition:
+
+  WAITING_TO_START -> MEASURING
+
+  The measurer floods the target with traffic on all open sockets up to the
+  limit that the coord set. The measurer verifies the bytes it gets back are
+  the same as it sent. Every second the measurer reports the number of bytes
+  it has received back from the relay to the coord.
+
+  If the measurer loses all sockets with the target, or upon a traffic
+  verification check failing, transition:
+
+  MEASURING -> FAILED
+
+  Else, once the measurer has sent the necessary number of per-second reports
+  to the coord (e.g. 30 for a 30s measurement), transition:
+
+  MEASURING -> FINISHED
+
+  The measurer disconnects from all parties, transition:
+
+  FINISHED -> IDLE
+
+  If at any time the measurer enters the failure state, it sends a failure
+  message to the coord, if possible, and closes any existing connections to
+  the target. Transition:
+
+  FAILED -> IDLE
+
+
+
+X.X State Machine: Relay
+
+  Initial: IDLE
+
+  The relay receives a msm-cred from a measurer. If the measurer is part of a
+  FF deployment that measured this relay too recently, the relay closes the
+  connection. If the contained coord-cred is invalid or doesn't verify, it
+  closes the connection. If everything seems fine, the relay sends a challenge
+  to the measurer, transition:
+
+  IDLE -> HANDSHAKING
+
+  A timeout timer is started.
+
+  The relay may receive msm-creds from other measurers. If so, it checks that
+  performs all the same checks as it did for the first measurer's msm-cred. If
+  the checks fail, transition:
+
+  HANDSHAKING -> FAILURE
+
+  Otherwise it sends each new measurer a challenge as well.
+
+  The measurers open additional sockets to the relay. On the original socket
+  and on these new ones they send the challenge's response. If any of the
+  responses don't verify, transition to failure.
+
+  Once the target has the indicated number of sockets open with each measurer,
+  transition:
+
+  HANDSHAKING -> WAITING
+
+  The timeout timer from the previous state keeps running. The relay waits. If
+  it doesn't receive any measurement traffic before the timeout hits,
+  transition:
+
+  WAITING -> FAILURE
+
+  Otherwise it receives measurement traffic and transitions:
+
+  WAITING -> MEASURING
+
+  The relay continues to decrypt and echo back measurement traffic. It
+  enforces the background traffic ratio. Every second it reports [XXX how?]
+  the amount of background traffic since last report.
+
+  If the relay loses all connections with measurers, transition:
+
+  MEASURING -> FAILURE
+
+  Once the relay has sent the same number of background traffic reports as
+  there were indicated seconds in the measurement (e.g. 30 reports for a 30s
+  measurement), transition:
+
+  MEASURING -> FINISHED
+
+  Once finished, if any connections with measurers remain, close them.
+  Transition:
+
+  FINISHED -> IDLE
+
+  If in the failure state, close any connections with measurers and
+  transition:
+
+  FAILURE -> IDLE
