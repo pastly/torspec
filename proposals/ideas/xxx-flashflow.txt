@@ -142,8 +142,6 @@ The measure commands are:
   3 -- MSM_BG        [backward]
   4 -- MSM_ERR       [forward and backward]
 
-[XXX use TLS client certs instead of shitty home-grown thing]
-
 Forward cells are sent from the Tor measurement client to the relay. Backward
 cells are sent from the relay to the Tor measurement client.
 
@@ -229,6 +227,14 @@ measurement connections, and exits measurement mode. It will not allow itself
 to be measured again for a period of time governed by the torrc
 option/consensus parameter.
 
+X.X.X Authentication to Target Relay
+
+The initial FlashFlow implementation will mostly focus on the functionality
+necessary for performing measurements. The final, fully deployment-ready
+FlashFlow code will (1) require each measurer to maintain a TLS identity
+certificate, and (2) have the dirauths vote on which measurer TLS fingerprints
+should be allowed to perform measurements and include the resulting list of
+fingerprints in the consensus.
 
 X.X FlashFlow code
 
