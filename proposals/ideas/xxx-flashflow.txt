@@ -53,6 +53,12 @@ FlashFlow's deployment shall be broken up into three stages.
   3. MVP + results used by Simple Bandwidth Scanner
 
 
+[XXX add short term and medium term goals]
+[XXX short term: impl working FF msm system]
+[XXX medium term: begin collectin data and producing v3bw files]
+[XXX long term: experiment using FF v3bw files to improve load balancing]
+[XXX    e.g. by replacing sbws weights or the observed bw]
+
 X. Minimally Viable Product
 
 The FlashFlow MVP will implement the core measurement mechanics in little-t
@@ -97,6 +103,10 @@ handling no background traffic but reporting that it has done so.  Possible
 values are in the range [0, 99] inclusive. Default: 25 (a maximum inflation
 factor of 1.33).
 
+[XXX Aaron thinks this will limit bg traffic when there isn't sufficient
+measurement traffic. Suggests forwarding bg traffic while there is no msm
+traffic waiting]
+
 FFMaxMeasurementDuration: the maximum amount of time, in seconds, that is
 allowed to pass from the moment the relay is notified that a measurement will
 begin soon and the end of the measurement. If this amount of time passes, the
@@ -108,7 +118,7 @@ the expected actual measurement duration.  Possible values are in the range
 
 X.X New Cell Types
 
-FlashFlow will introduce a new cell command MEAUSRE.
+FlashFlow will introduce a new cell command MEASURE.
 
 The payload of each MEASURE cell consists of:
 
@@ -123,6 +133,8 @@ The measure commands are:
   2 -- MSM_RESPONSE  [forward]
   3 -- MSM_ECHO      [forward and backward]
   4 -- MSM_BG        [backward]
+
+[XXX use TLS client certs instead of shitty home-grown thing]
 
 Forward cells are sent from the Tor measurement client to the relay. Backward
 cells are sent from the relay to the Tor measurement client.
@@ -232,7 +244,7 @@ port.
 [XXX for now I'll assume that an optional little-t tor control port module
 housing a lot of this code is the best idea.]
 
-
+[XXX add more details about how the cell checking process works]
 
 --------------------------------------------------------------------------------
 Additional draft material that may still have salvageable parts
