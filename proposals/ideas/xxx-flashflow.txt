@@ -32,12 +32,15 @@ described later in this document. Periodically it produces a v3bw file
 suitable for consumption by a Tor directory authority to make it a voting
 "bandwidth authority."
 
+[XXX this paragraph is vague, and perhaps unneeded now with short/medium/long
+term goals listed in a later section.]
 Eventually FlashFlow could replace the existing Torflow/Simple Bandwidth
 Scanner system. Tor can't get there overnight. Thus in addition to laying out
 how FlashFlow works, this document describes an initial deployment plan that
 will provide Tor with data not only valuable for informing future transition
 decisions but also for network health and monitoring.
 
+[XXX This is inaccurate now]
 This document starts with a series of design/specification sections describing
 how FlashFlow shall be implemented. After that, the first section describing
 the initial deployment plan is [XXX]. Finally, the implementation strategy
@@ -48,21 +51,26 @@ X. Deployment Stages
 
 FlashFlow's deployment shall be broken up into three stages.
 
-  1. Minimally Viable Product (MVP)
-  2. MVP + authentication chain
-  3. MVP + results used by Simple Bandwidth Scanner
+In the short term we want to implement a working FlashFlow measurement system.
+This requires code changes in little-t tor and an external FlashFlow codebase.
+The majority of the implementation work will be done here, and the product is
+a complete FlashFlow measurement system. Remaining pieces (e.g.
+authentication) are added later for enhanced security and network performance.
 
+In the medium term we want to begin collecting data with a FlashFlow
+deployment. The intermediate results and v3bw files produced will be made
+available (semi?) publicly for study.
 
-[XXX add short term and medium term goals]
-[XXX short term: impl working FF msm system]
-[XXX medium term: begin collectin data and producing v3bw files]
-[XXX long term: experiment using FF v3bw files to improve load balancing]
-[XXX    e.g. by replacing sbws weights or the observed bw]
+In the long term experiments will be performed to study ways of using FF v3bw
+files to improve load balancing. Two examples: (1) using FF v3bw files instead
+of sbws's (and eventually phasing out torflow/sbws), and (2) continuing to run
+sbws but use FF's results as a better estimate of relay capacity than observed
+bandwidth. Authentication and other FlashFlow features necessary to make it
+completely ready for full production deployment will be worked on here.
 
-X. Minimally Viable Product
+X. FlashFlow measurement system: Short term
 
-The FlashFlow MVP will implement the core measurement mechanics in little-t
-tor:
+Core measurement mechanics will be implemented in little-t tor:
 
   - New torrc options/consensus parameters
   - New cell types
@@ -72,12 +80,12 @@ tor:
     report the amount of background traffic, and limit the amount of
     background traffic
 
-The MVP will also consist of a separate codebase for the FlashFlow measurement
-system. 
+A separate codebase for the FlashFlow side of the measurement system will also
+be created.
 
 X.X Parameters
 
-The MVP will require some consensus parameters/torrc options. Each has some
+FlashFlow will require some consensus parameters/torrc options. Each has some
 default value if nothing is specified; the consensus parameter overrides this
 default value; the torrc option overrides both.
 
@@ -154,14 +162,14 @@ X.X Pre-Measurement Handshaking/Starting a Measurement
 Measurers start connecting to the target relay and each sends it a MSM_BEGIN
 cell. If the target is unwilling to be measured, it drops the cell and closes
 the connection. Otherwise it checks that the MSM_BEGIN cell indicates that the
-measurer is probably allowed to perform a measurement. For the MVP, this will
+measurer is probably allowed to perform a measurement. Initially, this will
 always be true.
 
-The target sends back a MSM_CHALLENGE containing a nonce. Beyond the MVP, the
-measurer will be expected to sign it and send back the signed message in a
-MSM_RESPONSE, thus demonstrating active possession of its identity key.
-For now, the measurer will send back a MSM_RESPONSE that the target will
-always accept.
+The target sends back a MSM_CHALLENGE containing a nonce. Beyond the initial
+implementation, the measurer will be expected to sign it and send back the
+signed message in a MSM_RESPONSE, thus demonstrating active possession of its
+identity key.  For now, the measurer will send back a MSM_RESPONSE that the
+target will always accept.
 
 The MSM_BEGIN cell contains at least:
 
