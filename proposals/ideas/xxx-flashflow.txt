@@ -102,14 +102,11 @@ values in the range [0 seconds, 7 days] inclusive. Default: 1 day.
 
 FFBackgroundTrafficPercent: the maximum amount of regular non-measurement
 traffic a relay should handle while being measured, as a percent of total
-traffic (measurement + non-measurement). For example, if this is 10 and if the
-relay has handled 9000 bytes of measurement traffic recently, then it shall
-limit itself to no more than 1000 bytes of non-measurement traffic this
-scheduling round. This parameter is a trade off between having to limit
-background traffic and limiting how much a relay can inflate its result by
-handling no background traffic but reporting that it has done so.  Possible
-values are in the range [0, 99] inclusive. Default: 25 (a maximum inflation
-factor of 1.33).
+traffic (measurement + non-measurement).  This parameter is a trade off
+between having to limit background traffic and limiting how much a relay can
+inflate its result by handling no background traffic but reporting that it has
+done so.  Possible values are in the range [0, 99] inclusive. Default: 25 (a
+maximum inflation factor of 1.33).
 
 [XXX Aaron thinks this will limit bg traffic when there isn't sufficient
 measurement traffic. Suggests forwarding bg traffic while there is no msm
@@ -227,14 +224,17 @@ measurement connections, and exits measurement mode. It will not allow itself
 to be measured again for a period of time governed by the torrc
 option/consensus parameter.
 
-X.X.X Authentication to Target Relay
-
-The initial FlashFlow implementation will mostly focus on the functionality
-necessary for performing measurements. The final, fully deployment-ready
-FlashFlow code will (1) require each measurer to maintain a TLS identity
-certificate, and (2) have the dirauths vote on which measurer TLS fingerprints
-should be allowed to perform measurements and include the resulting list of
-fingerprints in the consensus.
+During the measurement the relay limits its background traffic throughput
+according to ratio specified as a consensus parameter/torrc option.  For
+example, if the ratio is 25% and if the relay has handled 7500 bytes of
+measurement traffic recently, then it shall limit itself to no more than 2500
+bytes of non-measurement traffic this scheduling round.  In case there is a
+lack of measurement traffic for some reason, the relay will always allow
+itself to send at least 10 background traffic cells each scheduling round.
+This worked fine for us in our real Internet experiments. Other strategies
+will be investigated that allow the relay to continue sending background
+traffic in the absence of measurement traffic while still trending towards
+some configured ratio.
 
 X.X FlashFlow code
 
@@ -348,6 +348,45 @@ a bucket size of approximately 125:
 
 Slower relays can cheat more easily, faster relays are less likely to be able
 to cheat.
+
+X. FlashFlow measurement system: Medium term
+
+FlashFlow has been implemented and relays are starting to update to a version
+of Tor that supports it.
+
+NRL will host a FlashFlow deployment consisting of a FF coordinator and a
+single FF measurer on a single 1 Gbit/s machine. Data produced by this
+deployment will be made available (semi?) publicly, including both v3bw files
+and intermediate results.
+
+X. FlashFlow measurement system: Long term
+
+In the long term, finishing-touch development work will be done and
+experiments will be run to determine the best way to integrate FlashFlow into
+the Tor ecosystem.
+
+X.X Authentication to Target Relay
+
+FlashFlow measurers will maintain TLS identity certificates and use them when
+connecting to target Tor relays. Dirauths will vote on which measurers are
+allowed to perform measurements. Relays will update from stub authentication
+methods to methods that actually check that the measurer used a client TLS
+certificate and that it's listed in the consensus.
+
+X.X Experiments
+
+   [XXX todo]
+
+X.X Other Changes/Investigations/Ideas
+
+- Add a cell that the target relay sends to the measurers indicating its CPU
+  and memory usage, whether it has a shortage of sockets, how much bandwidth
+  load it has been experiencing lately, etc. Use this information to lower a
+  relays weight, never increase.
+- If FlashFlow and sbws work together (as opposed to FlashFlow replacing
+  sbws), consider logic for how much sbws can increase/decrease FF results
+
+
 
 --------------------------------------------------------------------------------
 Additional draft material that may still have salvageable parts
