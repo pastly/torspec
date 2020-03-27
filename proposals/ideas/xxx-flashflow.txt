@@ -197,6 +197,11 @@ the actual measurement will last.  bg_conn is a flag indicating whether or not
 this connection is to be used for background traffic reports (MSM_BG cells)
 instead of MSM_ECHO traffic.
 
+[XXX Do MSM_BG cells really need their own connection? If we do that, should
+it be considered a "control connection"? What else would the control
+connection be used for?
+https://github.com/pastly/torspec/pull/1#discussion_r397472928]
+
 MSM_PARAMS_OK has no payload: it's just padding bytes to make the cell 514
 bytes long.
 
