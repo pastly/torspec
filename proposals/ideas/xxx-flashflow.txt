@@ -46,18 +46,7 @@ Torflow: FlashFlow allows a relay to inflate its measured capacity by up to
 1.33x (configured by a parameter) while Torflow allows weight inflation by a
 factor of 89x [0] or even 177x [1].
 
-[0] F. Thill. Hidden Service Tracking Detection and Bandwidth Cheating in Tor
-    Anonymity Network. Master’s thesis, Univ. Luxembourg, 2014.
-[1] A. Johnson, R. Jansen, N. Hopper, A. Segal, and P. Syverson. PeerFlow:
-    Secure Load Balancing in Tor. Proceedings on Privacy Enhancing Technologies
-    (PoPETs), 2017(2), April 2017.
-
-[XXX This is inaccurate now]
-This document starts with a series of design/specification sections describing
-how FlashFlow shall be implemented. After that, the first section describing
-the initial deployment plan is [XXX]. Finally, the implementation strategy
-(i.e. where is all this code going to go?) is described in [XXX].
-
+[XXX A paragraph summarizing the layout of this proposal]
 
 X. Deployment Stages
 
@@ -82,7 +71,18 @@ completely ready for full production deployment will be worked on here.
 
 X. FlashFlow measurement system: Short term
 
-Core measurement mechanics will be implemented in little-t tor:
+The core measurement mechanics will be implemented in little-t tor, but a
+separate codebase for the FlashFlow side of the measurement system will also
+be created. This section is divided into free parts: first a discussion of
+changes/additions that logically reside entirely within tor (essentially:
+relay-side modifications), second a discussion of the separate FlashFlow
+code that also requires some amount of tor changes (essentially: measurer-side
+modifications), and third a security discussion.
+
+X.X Little-T Tor Components
+
+The primary additions/changes that entirely reside within tor on the relay
+side:
 
   - New torrc options/consensus parameters.
   - New cell types.
@@ -92,10 +92,7 @@ Core measurement mechanics will be implemented in little-t tor:
     set a cap on the amount of background traffic it transfers, and report the
     amount of transferred background traffic.
 
-A separate codebase for the FlashFlow side of the measurement system will also
-be created.
-
-X.X Parameters
+X.X.X Parameters
 
 FlashFlow will require some consensus parameters/torrc options. Each has some
 default value if nothing is specified; the consensus parameter overrides this
@@ -129,7 +126,7 @@ the expected actual measurement duration.  Possible values are in the range
 [10, 120] inclusive. Default: 45.
 
 
-X.X New Cell Types
+X.X.X New Cell Types
 
 FlashFlow will introduce a new cell command MEASURE.
 
@@ -170,7 +167,7 @@ correctly decrypting all cells, the measurer will choose random outgoing
 cells, encrypt them, remember the ciphertext, and verify the corresponding
 incoming cell matches. 
 
-X.X Pre-Measurement Handshaking/Starting a Measurement
+X.X.X Pre-Measurement Handshaking/Starting a Measurement
 
 Measurers start connecting to the target relay and each sends it a MSM_PARAMS
 cell. If the target is unwilling to be measured at this time, it responds with
@@ -237,7 +234,7 @@ The error string is optional in all cases. It isn't present if the first byte
 of err_str is null, otherwise it is present. It ends at the first null byte or
 the end of the cell, whichever comes first.
 
-X.X Measurement Mode
+X.X.X Measurement Mode
 
 The relay considers the measurement to have started the moment it receives the
 first MSM_ECHO cell from any measurer. At this point, the relay
@@ -267,10 +264,11 @@ traffic this scheduling round. In case there was very little measurement
 traffic since the last background traffic scheduling round, tor would allow
 itself to send at least 100 cells of background traffic.
 
-X.X FlashFlow code
+X.X FlashFlow Components
 
 The FF coordinator and measurer code will reside in a FlashFlow repository
-separate from little-t tor.
+separate from little-t tor. The FF measurer code will require supporting tor
+code, which is discussed in this section.
 
 The coordinator is responsible for scheduling measurements, aggregating
 results, and producing v3bw files.
@@ -405,6 +403,10 @@ Slower relays can cheat more easily but the amount of extra weight they can
 obtain is insignificant in absolute terms. Faster relays are essentially
 unable to cheat.
 
+X.X Security
+
+[XXX move stuff into here, add stuff too]
+
 X. FlashFlow measurement system: Medium term
 
 The medium term deployment stage begins after FlashFlow has been implemented
@@ -458,3 +460,12 @@ X.X Other Changes/Investigations/Ideas
   relays weight, never increase.
 - If FlashFlow and sbws work together (as opposed to FlashFlow replacing
   sbws), consider logic for how much sbws can increase/decrease FF results
+
+
+X. Citations
+
+[0] F. Thill. Hidden Service Tracking Detection and Bandwidth Cheating in Tor
+    Anonymity Network. Master’s thesis, Univ. Luxembourg, 2014.
+[1] A. Johnson, R. Jansen, N. Hopper, A. Segal, and P. Syverson. PeerFlow:
+    Secure Load Balancing in Tor. Proceedings on Privacy Enhancing Technologies
+    (PoPETs), 2017(2), April 2017.
