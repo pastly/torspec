@@ -351,7 +351,14 @@ generate fake measurement cells locally, ignore the measurement traffic it is
 receiving, and flood the measurer with more traffic that it (the measurer) is
 even sending.
 
-X.X.X.X Security of bucket size, N
+The security of echo cell verification is discussed in Security Section [XXX].
+
+X.X Security
+
+In this section we discuss the security of various aspects of FlashFlow and
+the tor changes it requires.
+
+X.X.X Echo Cell Verification: Bucket Size
 
 A smaller bucket size means more cells are checked and FF is more likely to
 detect a malicious target. It also means more bookkeeping overhead (CPU/RAM).
@@ -375,7 +382,7 @@ Thus the odds the adversary can cheat in `X` consecutive buckets are
 In our case, X will be highly varied: Slow relays won't see very many
 buckets, but fast relays will. The damage to the network a very slow relay can
 do by faking being only slightly faster is limited. Nonetheless, for now we
-motivate the selection of bucket size, N, with a slow relay:
+motivate the selection of bucket size, with a slow relay:
 
   - Assume a very slow relay of 1 Mbit/s capacity that will cheat 1 cell in
     each bucket. Assume a 30 second measurement.
@@ -403,9 +410,6 @@ Slower relays can cheat more easily but the amount of extra weight they can
 obtain is insignificant in absolute terms. Faster relays are essentially
 unable to cheat.
 
-X.X Security
-
-[XXX move stuff into here, add stuff too]
 
 X. FlashFlow measurement system: Medium term
 
