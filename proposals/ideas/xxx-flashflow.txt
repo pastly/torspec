@@ -410,6 +410,46 @@ Slower relays can cheat more easily but the amount of extra weight they can
 obtain is insignificant in absolute terms. Faster relays are essentially
 unable to cheat.
 
+X.X.X Weight Inflation
+
+Target relays are an active part of the measurement process; they know they
+are getting measured. While a relay cannot fake the measurement traffic, it
+can trivially stop transferring client background traffic for the duration of
+the measurement yet claim it carried some. More generally, there is no
+verification on the claimed amount of background traffic during the
+measurement, the relay can claim whatever it wants, but it will not be trusted
+above the ratio the FlashFlow deployment is configured to know. This places an
+easy to understand, firm, and (if set as we suggest) low cap on how much a
+relay can inflate its measured capacity.
+
+Consider a background/measurement ratio of 1/4, or 25%. Assume the relay in
+question has a hard limit on capacity (e.g. from its NIC) of 100 Mbit/s. The
+relay is supposed to use up to 25% of its capacity for background traffic and
+the remaining 75%+ capacity for measurement traffic. Instead the relay ceases
+carrying background traffic, uses all 100 Mbit/s of capacity to handle
+measurement traffic, and reports ~33 Mbit/s of background traffic (33/133 =
+~25%). FlashFlow would trust this and consider the relay capable of 133
+Mbit/s. (If the relay were to report more than ~33 Mbit/s, FlashFlow caps them
+down to just ~33 Mbit/s.) With r=25%, FlashFlow only allows 1.33x weight
+inflation.
+
+Prior work shows that Torflow allows weight inflation by a factor of 89x [0]
+or even 177x [1].
+
+The ratio chosen is a trade off between impact on background traffic and
+security: r=50% allows a relay to double its weight but won't impact client
+traffic for relays with steady state throughput below 50%, while r=10% allows
+a very low inflation factor but will cause throttling of client traffic at far
+more relays.
+
+We feel r=25% (thus 1.33x inflation) is reasonable for initial deployment.
+Longer term, other ratios can be explored.
+
+It may be possible to catch relays performing this attack, especially if they
+literally drop all background traffic during the measurement: have the
+measurer (or some party on its behalf) create a regular stream through the
+relay and measure the throughput on the stream before/during/after the
+measurement. This can be explored longer term.
 
 X. FlashFlow measurement system: Medium term
 
@@ -464,6 +504,12 @@ X.X Other Changes/Investigations/Ideas
   relays weight, never increase.
 - If FlashFlow and sbws work together (as opposed to FlashFlow replacing
   sbws), consider logic for how much sbws can increase/decrease FF results
+- Coordination of multiple FlashFlow deployments: scheduling of measurements,
+  seeding schedule with shared random value.
+- Other background/measurement traffic ratios. Dynamic? (known slow relay =>
+  more allowed bg traffic?)
+- Catching relays inflating their measured capacity by dropping background
+  traffic.
 
 
 X. Citations
