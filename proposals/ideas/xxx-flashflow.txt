@@ -1,5 +1,5 @@
 Filename: xxx-flashflow.txt
-Title: Flashflow: A Secure Speed Test for Tor
+Title: FlashFlow: A Secure Speed Test for Tor (Parent Proposal)
 Author: Matthew Traudt, Rob Jansen, Aaron Johnson
 Created: __________
 Status: Draft
@@ -14,11 +14,14 @@ when and how to measure Tor relays. A measurement consists of the following
 steps:
 
   X. The measurement nodes demonstrate to the target relay permission to
-     perform measurements
-  X. The measurement nodes open many sockets to the target relay and create a
-     one-hop circuit to the target relay on each one
+     perform measurements.
+  X. The measurement nodes open many TCP connections to the target relay and
+     create a one-hop circuit to the target relay on each one.
   X. For 30 seconds the measurement nodes send measurement cells to the
-     target relay and verify that the cells echoed back match the ones sent
+     target relay and verify that the cells echoed back match the ones sent.
+     During this time the relay caps the amount of background traffic it
+     transfers. Background and measurement traffic are handled separately at
+     the relay.
   X. For every second during the measurement, the measurement nodes report to
      the authority node how much traffic was echoed back.
      The target relay also reports the amount of per-second background
@@ -32,13 +35,22 @@ described later in this document. Periodically it produces a v3bw file
 suitable for consumption by a Tor directory authority to make it a voting
 "bandwidth authority."
 
-[XXX this paragraph is vague, and perhaps unneeded now with short/medium/long
-term goals listed in a later section.]
-Eventually FlashFlow could replace the existing Torflow/Simple Bandwidth
-Scanner system. Tor can't get there overnight. Thus in addition to laying out
-how FlashFlow works, this document describes an initial deployment plan that
-will provide Tor with data not only valuable for informing future transition
-decisions but also for network health and monitoring.
+FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
+the entire existing Tor network from scratch while Torflow takes 2 days;
+FlashFlow measures relays it hasn't seen recently as soon as it learns about
+them (i.e. every new consensus) while Torflow can take a day or more; and
+FlashFlow accurately measures new high-capacity relays the first time and
+every time while Torflow takes days/weeks to assign them their full fair share
+of bandwidth (especially for non-exits). FlashFlow is more secure than
+Torflow: FlashFlow allows a relay to inflate its measured capacity by up to
+1.33x (configured by a parameter) while Torflow allows weight inflation by a
+factor of 89x [0] or even 177x [1].
+
+[0] F. Thill. Hidden Service Tracking Detection and Bandwidth Cheating in Tor
+    Anonymity Network. Master’s thesis, Univ. Luxembourg, 2014.
+[1] A. Johnson, R. Jansen, N. Hopper, A. Segal, and P. Syverson. PeerFlow:
+    Secure Load Balancing in Tor. Proceedings on Privacy Enhancing Technologies
+    (PoPETs), 2017(2), April 2017.
 
 [XXX This is inaccurate now]
 This document starts with a series of design/specification sections describing
@@ -72,13 +84,13 @@ X. FlashFlow measurement system: Short term
 
 Core measurement mechanics will be implemented in little-t tor:
 
-  - New torrc options/consensus parameters
-  - New cell types
+  - New torrc options/consensus parameters.
+  - New cell types.
   - Pre-measurement handshaking (with authentication reduced to stub methods
-    that always indicate successful verification)
+    that always indicate successful verification).
   - Measurment mode, during which the relay will echo traffic with measurers,
-    report the amount of background traffic, and limit the amount of
-    background traffic
+    set a cap on the amount of background traffic it transfers, and report the
+    amount of transferred background traffic.
 
 A separate codebase for the FlashFlow side of the measurement system will also
 be created.
@@ -107,10 +119,6 @@ between having to limit background traffic and limiting how much a relay can
 inflate its result by handling no background traffic but reporting that it has
 done so.  Possible values are in the range [0, 99] inclusive. Default: 25 (a
 maximum inflation factor of 1.33).
-
-[XXX Aaron thinks this will limit bg traffic when there isn't sufficient
-measurement traffic. Suggests forwarding bg traffic while there is no msm
-traffic waiting]
 
 FFMaxMeasurementDuration: the maximum amount of time, in seconds, that is
 allowed to pass from the moment the relay is notified that a measurement will
@@ -142,6 +150,15 @@ The measure commands are:
 Forward cells are sent from the Tor measurement client to the relay. Backward
 cells are sent from the relay to the Tor measurement client.
 
+PARAMS and PARAMS_OK are used during the pre-measurement stage to tell the
+target what to expect and for the relay to positively acknowledge the message.
+ECHO cells are the measurement traffic; the measurer generates them, sends
+them to the target, and the target echos them back. The target send a BG cells
+once per second to report the amount of background traffic it is handling. ERR
+cells are used to signal to the other party that there has been some sort of
+problem and that the measurement should be aborted. These cell types are
+described in more detail in the next section.
+
 The only cell type that is sometimes encrypted is MSM_ECHO; all other types
 are never encrypted.
 
@@ -164,17 +181,20 @@ the length isn't too long, the indicated relay identity is its own, etc.).
 Initially, this will always be true. If the target is happy, it sends a
 MSM_PARAMS_OK, otherwise it sends a MSM_ERR and closes the connection.
 
+
 Upon receiving a MSM_PARAMS_OK from the target, the measurer will open the
 remaining sockets with the target. If it receives a MSM_ERR, it reports the
-error to the coordinator and considers the measurement a failure.
+error to the coordinator and considers the measurement a failure.  The target
+needs to treat connections from measurers as special and not count them in the
+DoS detection algorithm.
 
 The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
-  - num_socks    [2 bytes]
+  - num_conns    [2 bytes]
   - msm_duration [1 byte]
   - bg_conn      [1 byte]
 
-num_socks is the total number of sockets this measurer will open with the
+num_conns is the total number of TCP connections this measurer will open with the
 target for this measurement. msm_duration is the duration, in seconds, that
 the actual measurement will last.  bg_conn is a flag indicating whether or not
 this connection is to be used for background traffic reports (MSM_BG cells)
@@ -190,6 +210,18 @@ The payload of MSM_ECHO cells:
 [XXX it's possible while implementing the verification of MSM_ECHO cells that
 it will be discovered that it will be impossible to allow the measurer to skip
 encryption of most cells while requiring the relay to decrypt all cells]
+
+The payload of MSM_BG cells:
+
+  - second        [1 byte]
+  - sent_bg_bytes [4 bytes]
+  - recv_bg_bytes [4 bytes]
+
+second is the number of seconds since the measurement began. MSM_BG cells are
+sent once per second. The first cell will have this set to 1, and each
+subsequent cell will increment it by one. sent_bg_bytes is the number of
+background traffic bytes sent in the last second (since the last MSM_BG cell).
+recv_bg_bytes is the same but for received bytes.
 
 The payload of MSM_ERR cells:
 
@@ -211,9 +243,9 @@ The relay considers the measurement to have started the moment it receives the
 first MSM_ECHO cell from any measurer. At this point, the relay
 
   - starts a repeating 1s timer on which it will report the amount of
-    background traffic on the appropriate connection
+    background traffic on the appropriate connection.
   - enters "measurement mode" and limits the amount of background traffic it
-    handles according to the torrc option/consensus parameter
+    handles according to the torrc option/consensus parameter.
 
 The relay decrypts and echos back all MSM_ECHO cells it receives on
 measurement connections until it has reported its amount of background traffic
@@ -224,17 +256,16 @@ measurement connections, and exits measurement mode. It will not allow itself
 to be measured again for a period of time governed by the torrc
 option/consensus parameter.
 
-During the measurement the relay limits its background traffic throughput
-according to ratio specified as a consensus parameter/torrc option.  For
-example, if the ratio is 25% and if the relay has handled 7500 bytes of
-measurement traffic recently, then it shall limit itself to no more than 2500
-bytes of non-measurement traffic this scheduling round.  In case there is a
-lack of measurement traffic for some reason, the relay will always allow
-itself to send at least 10 background traffic cells each scheduling round.
-This worked fine for us in our real Internet experiments. Other strategies
-will be investigated that allow the relay to continue sending background
-traffic in the absence of measurement traffic while still trending towards
-some configured ratio.
+During the measurement the relay targets a ratio of background traffic to
+measurement traffic as specified by a consensus parameter/torrc option.
+Strategies for how to best achieve this with the smallest impact on background
+client traffic possible, even in the presence of a lot/very little measurement
+traffic, will be investigated.  The FF prototype worked in the following way:
+Assume the ratio is 25% and the relay has handled 7500 cells of measurement
+traffic recently. Tor then limits itself to 2500 cells of non-measurement
+traffic this scheduling round. In case there was very little measurement
+traffic since the last background traffic scheduling round, tor would allow
+itself to send at least 100 cells of background traffic.
 
 X.X FlashFlow code
 
@@ -242,23 +273,23 @@ The FF coordinator and measurer code will reside in a FlashFlow repository
 separate from little-t tor.
 
 The coordinator is responsible for scheduling measurements, aggregating
-results, and producing v3bw files. It needs an accompanying Tor process so
-that it has access to consensuses as they come in.
+results, and producing v3bw files.
+It needs continuous access to new consensus files, which it can obtain by
+running an accompanying Tor process in client mode.
 
 The measurers take commands from the coordinator, connect to target relays
 with many sockets, send them traffic, and verify the received traffic is the
-same as what was sent. Measurers either need to link against tor and call
-internal, undocumented, the-public-isnt-supposed-to-use-this-directly APIs
-(e.g. calling append_cell_to_circuit_queue() directly instead of using the
-limited but public interface exposed in feature/api/tor_api.c and
-tools/tor_runner.c), or tor needs some of this functionality added to it so
-that it can do some of these things itself when given commands via the control
-port.
+same as what was sent.
+Measurers need access to a lot of internal tor functionality. One strategy is
+to house as much logic as possible inside an compile-time-optional control
+port module that calls into other parts of tor. Alternatively FlashFlow could
+link against tor and call internal tor functions directly.
 
 [XXX for now I'll assume that an optional little-t tor control port module
 housing a lot of this code is the best idea.]
 
-Notable new things that FlashFlow code in Tor will need to do:
+Notable new things that internal tor code will need to do on the measurer
+(client) side:
 
   X. Open many TLS+TCP connections to the same relay on purpose
   X. Verify echo cells
@@ -272,23 +303,47 @@ care if it reuses an existing connection, but FF does want to create many
 different connections. The cleanest way to accomplish this will be
 investigated.
 
+On the relay side, these measurer connections need to not count towards DoS
+detection algorithms.
+
 X.X.X Verify echo cells
 
 A parameter will exist to tell the measurers with what frequency they shall
 verify cells echoed back to them match what they sent. This parameter does not
-to exist outside of the FF deployment (e.g. it doesn't need to be a consensus
-parameter).
+need to exist outside of the FF deployment (e.g. it doesn't need to be a
+consensus parameter).
 
 The parameter instructs the measurers to check 1 out of every N cells.
 
-The measurer logically splits its output stream of cells into buckets of size
-N. At the start of each bucket the measurer chooses a random index in the
-bucket. Upon sending the cell at that index, the measurer records it.
+The measurer keeps a count of how many measurement cells it has sent. It also
+logically splits its output stream of cells into buckets of size N. At the
+start of each bucket (when num_sent % N == 0), the measurer chooses a random
+index in the bucket. Upon sending the cell at that index (num_sent % N ==
+chosen_index), the measurer records the cell.
+
 The measurer also counts cells that it receives. When it receives a cell at an
 index that was recorded, it verifies that the received cell matches the
 recorded sent cell. If they match, no special action is taken. If they don't
 match, the measurer indicates failure to the coordinator and target relay and
 closes all connections, ending the measurement.
+
+X.X.X.X Example
+
+Consider bucket_size is 1000. For the moment ignore cell encryption.
+
+We start at idx=0 and pick an idx in [0, 1000) to record, say 640. At idx=640
+we record the cell. At idx=1000 we choose a new idx in [1000, 2000) to record,
+say 1236. At idx=1236 we record the cell. At idx=2000 we choose a new idx in
+[2000, 3000). Etc.
+
+There's 2000+ cells in flight and the measurer has recorded two items:
+
+  - (640, contents_of_cellA)
+  - (1236, contents_of_cellB)
+
+Consider the receive side now. It counts the cells it receives. At receive
+idx=640, it checks the received cell matches the saved cell from before. At
+receive idx=1236, it again checks the received cell matches. Etc.
 
 X.X.X.X Motivation
 
@@ -321,7 +376,7 @@ Thus the odds the adversary can cheat in `X` consecutive buckets are
 
 In our case, X will be highly varied: Slow relays won't see very many
 buckets, but fast relays will. The damage to the network a very slow relay can
-do by faking being only slightly faster is limit. Nonetheless, for now we
+do by faking being only slightly faster is limited. Nonetheless, for now we
 motivate the selection of bucket size, N, with a slow relay:
 
   - Assume a very slow relay of 1 Mbit/s capacity that will cheat 1 cell in
@@ -346,18 +401,22 @@ a bucket size of approximately 125:
   - bucket size of 125 cells means 73,000 / 125 = 584 buckets
   - (124/125)^(584) = 0.918% chance of successfully cheating
 
-Slower relays can cheat more easily, faster relays are less likely to be able
-to cheat.
+Slower relays can cheat more easily but the amount of extra weight they can
+obtain is insignificant in absolute terms. Faster relays are essentially
+unable to cheat.
 
 X. FlashFlow measurement system: Medium term
 
-FlashFlow has been implemented and relays are starting to update to a version
-of Tor that supports it.
+The medium term deployment stage begins after FlashFlow has been implemented
+and relays are starting to update to a version of Tor that supports it.
 
-NRL will host a FlashFlow deployment consisting of a FF coordinator and a
+We plan to host a FlashFlow deployment consisting of a FF coordinator and a
 single FF measurer on a single 1 Gbit/s machine. Data produced by this
 deployment will be made available (semi?) publicly, including both v3bw files
 and intermediate results.
+
+Any development changes needed during this time would go through separate
+proposals.
 
 X. FlashFlow measurement system: Long term
 
@@ -365,11 +424,15 @@ In the long term, finishing-touch development work will be done and
 experiments will be run to determine the best way to integrate FlashFlow into
 the Tor ecosystem.
 
+Any development changes needed during this time would go through separate
+proposals.
+
 X.X Authentication to Target Relay
 
 FlashFlow measurers will maintain TLS identity certificates and use them when
 connecting to target Tor relays. Dirauths will vote on which measurers are
-allowed to perform measurements. Relays will update from stub authentication
+allowed to perform measurements in the same way they currently vote on
+recommended tor versions. Relays will update from stub authentication
 methods to methods that actually check that the measurer used a client TLS
 certificate and that it's listed in the consensus.
 
@@ -379,6 +442,16 @@ X.X Experiments
 
 X.X Other Changes/Investigations/Ideas
 
+- How can FlashFlow data be used in a way that doesn't lead to poor load
+  balancing given the following items that lead to non-uniform client
+  behavior:
+    - Guards that high-traffic HSs choose (for 3 months at a time)
+    - Guard vs middle flag allocation issues
+    - New Guard nodes (Guardfraction)
+    - Exit policies other than default/all
+    - Directory activity
+    - Total onion service activity
+    - Super long-lived circuits
 - Add a cell that the target relay sends to the measurers indicating its CPU
   and memory usage, whether it has a shortage of sockets, how much bandwidth
   load it has been experiencing lately, etc. Use this information to lower a
