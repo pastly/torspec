@@ -36,7 +36,7 @@ estimates in the form of a v3bw file, which is suitable for consumption by a Tor
 directory and allows FlashFlow to be a voting "bandwidth authority."
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
-the entire existing Tor network from scratch while Torflow takes 2 days;
+the entire existing Tor network from scratch (with 3 Gbit/s measurer capacity) while Torflow takes 2 days;
 FlashFlow measures relays it hasn't seen recently as soon as it learns about
 them (i.e. every new consensus) while Torflow can take a day or more; and
 FlashFlow accurately measures new high-capacity relays the first time and
@@ -54,7 +54,7 @@ FlashFlow's deployment shall be broken up into three stages.
 
 In the short term we want to implement a working FlashFlow measurement system.
 This requires code changes in little-t tor and an external FlashFlow codebase.
-The majority of the implementation work will be done here, and the product is
+The majority of the implementation work will be done in the short term, and the product is
 a complete FlashFlow measurement system. Remaining pieces (e.g.
 authentication) are added later for enhanced security and network performance.
 
@@ -267,13 +267,34 @@ round, to ensure it always allows some minimum amount of background traffic.
 X.X FlashFlow Components
 
 The FF coordinator and measurer code will reside in a FlashFlow repository
-separate from little-t tor. The FF measurer code will require supporting tor
-code, which is discussed in this section.
+separate from little-t tor.
+
+This section first discusses notable functions of the FlashFlow coordinator,
+then goes on to discuss FF measurer code that will require supporting tor
+code.
+
+X.X.X FlashFlow Coordinator
 
 The coordinator is responsible for scheduling measurements, aggregating
 results, and producing v3bw files.
 It needs continuous access to new consensus files, which it can obtain by
 running an accompanying Tor process in client mode.
+
+The coordinator has the following functions, which will be described in this
+section:
+
+  - schedule measurements.
+  - v3bw file generation.
+
+X.X.X.X Measurement Schedule
+
+asdf
+
+X.X.X.X Generating V3BW files
+
+asdf
+
+X.X.X FlashFlow Measurer
 
 The measurers take commands from the coordinator, connect to target relays
 with many sockets, send them traffic, and verify the received traffic is the
@@ -292,7 +313,7 @@ Notable new things that internal tor code will need to do on the measurer
   X. Open many TLS+TCP connections to the same relay on purpose
   X. Verify echo cells
 
-X.X.X Open many connections
+X.X.X.X Open many connections
 
 FlashFlow prototypes needed to "hack in" a flag in the
 open-a-connection-with-this-relay function call change that indicated whether
@@ -304,7 +325,7 @@ investigated.
 On the relay side, these measurer connections need to not count towards DoS
 detection algorithms.
 
-X.X.X Verify echo cells
+X.X.X.X Verify echo cells
 
 A parameter will exist to tell the measurers with what frequency they shall
 verify that cells echoed back to them match what was sent. This parameter does
@@ -325,7 +346,7 @@ recorded sent cell. If they match, no special action is taken. If they don't
 match, the measurer indicates failure to the coordinator and target relay and
 closes all connections, ending the measurement.
 
-X.X.X.X Example
+X.X.X.X.X Example
 
 Consider bucket_size is 1000. For the moment ignore cell encryption.
 
@@ -343,7 +364,7 @@ Consider the receive side now. It counts the cells it receives. At receive
 idx=640, it checks the received cell matches the saved cell from before. At
 receive idx=1236, it again checks the received cell matches. Etc.
 
-X.X.X.X Motivation
+X.X.X.X.X Motivation
 
 A malicious relay may want to skip decryption of measurement cells to save CPU
 cycles and obtain a higher capacity estimate. More generally, it could
