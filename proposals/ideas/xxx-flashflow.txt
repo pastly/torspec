@@ -4,8 +4,6 @@ Author: Matthew Traudt, Rob Jansen, Aaron Johnson
 Created: __________
 Status: Draft
 
-Overview:
-
 X. Introduction
 
 FlashFlow is a new distributed bandwidth measurement system for Tor that
