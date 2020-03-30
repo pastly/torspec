@@ -172,11 +172,10 @@ X.X.X Pre-Measurement Handshaking/Starting a Measurement
 Measurers start connecting to the target relay and each sends it a MSM_PARAMS
 cell. If the target is unwilling to be measured at this time, it responds with
 an error cell and closes the connection.  Otherwise it checks that the
-MSM_PARAMS cell indicates that the measurer is probably allowed to perform a
-measurement and that the parameters of the measurement are acceptable (e.g.
-the length isn't too long, the indicated relay identity is its own, etc.).
-Initially, this will always be true. If the target is happy, it sends a
-MSM_PARAMS_OK, otherwise it sends a MSM_ERR and closes the connection.
+parameters of the measurement are acceptable (e.g. the length isn't too long,
+the indicated relay identity is its own, etc.). Initially, this will always be
+true. If the target is happy, it sends a MSM_PARAMS_OK, otherwise it sends a
+MSM_ERR and closes the connection.
 
 
 Upon receiving a MSM_PARAMS_OK from the target, the measurer will open the
