@@ -33,7 +33,7 @@ steps:
 FlashFlow performs a measurement of every relay according to a schedule
 described later in this document. Periodically it produces relay capacity
 estimates in the form of a v3bw file, which is suitable for consumption by a Tor
-directory and allow FlashFlow to be a voting "bandwidth authority."
+directory and allows FlashFlow to be a voting "bandwidth authority."
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
 the entire existing Tor network from scratch while Torflow takes 2 days;
