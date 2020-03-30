@@ -177,7 +177,6 @@ the indicated relay identity is its own, etc.). Initially, this will always be
 true. If the target is happy, it sends a MSM_PARAMS_OK, otherwise it sends a
 MSM_ERR and closes the connection.
 
-
 Upon receiving a MSM_PARAMS_OK from the target, the measurer will open the
 remaining sockets with the target. If it receives a MSM_ERR, it reports the
 error to the coordinator and considers the measurement a failure.  The target
@@ -190,8 +189,8 @@ The payload of MSM_PARAMS cells [XXX more may need to be added]:
   - msm_duration [1 byte]
   - bg_conn      [1 byte]
 
-num_conns is the total number of TCP connections this measurer will open with the
-target for this measurement. msm_duration is the duration, in seconds, that
+num_conns is the total number of TCP connections this measurer will open with
+the target for this measurement. msm_duration is the duration, in seconds, that
 the actual measurement will last.  bg_conn is a flag indicating whether or not
 this connection is to be used for background traffic reports (MSM_BG cells)
 instead of MSM_ECHO traffic.
@@ -258,15 +257,12 @@ to be measured again for a period of time governed by the torrc
 option/consensus parameter.
 
 During the measurement the relay targets a ratio of background traffic to
-measurement traffic as specified by a consensus parameter/torrc option.
-Strategies for how to best achieve this with the smallest impact on background
-client traffic possible, even in the presence of a lot/very little measurement
-traffic, will be investigated.  The FF prototype worked in the following way:
-Assume the ratio is 25% and the relay has handled 7500 cells of measurement
-traffic recently. Tor then limits itself to 2500 cells of non-measurement
-traffic this scheduling round. In case there was very little measurement
-traffic since the last background traffic scheduling round, tor would allow
-itself to send at least 100 cells of background traffic.
+measurement traffic as specified by a consensus parameter/torrc option. For a
+given ratio r, if the relay has handled x cells of measurement traffic recently,
+Tor then limits itself to y = xr/(1-r) cells of non-measurement traffic this
+scheduling round. The target will enforce that a minimum of 10 Mbit/s of
+measurement traffic is recorded since the last background traffic scheduling
+round, to ensure it always allows some minimum amount of background traffic.
 
 X.X FlashFlow Components
 
@@ -311,8 +307,8 @@ detection algorithms.
 X.X.X Verify echo cells
 
 A parameter will exist to tell the measurers with what frequency they shall
-verify cells echoed back to them match what they sent. This parameter does not
-need to exist outside of the FF deployment (e.g. it doesn't need to be a
+verify that cells echoed back to them match what was sent. This parameter does
+not need to exist outside of the FF deployment (e.g. it doesn't need to be a
 consensus parameter).
 
 The parameter instructs the measurers to check 1 out of every N cells.
@@ -400,7 +396,7 @@ motivate the selection of bucket size, with a slow relay:
     `(49/50)^(146)`, or about 5.2%.
 
 This sounds high, but a relay capable of double the bandwidth (2 Mbit/s) will
-have (49/50)^(2*146) or 0.2% odds of success. Quite low already.
+have (49/50)^(2*146) or 0.2% odds of success, which is quite low.
 
 Wanting a <1% chance that a 10 Mbit/s relay can successfully cheat results in
 a bucket size of approximately 125:
@@ -420,8 +416,8 @@ Target relays are an active part of the measurement process; they know they
 are getting measured. While a relay cannot fake the measurement traffic, it
 can trivially stop transferring client background traffic for the duration of
 the measurement yet claim it carried some. More generally, there is no
-verification on the claimed amount of background traffic during the
-measurement, the relay can claim whatever it wants, but it will not be trusted
+verification of the claimed amount of background traffic during the
+measurement. The relay can claim whatever it wants, but it will not be trusted
 above the ratio the FlashFlow deployment is configured to know. This places an
 easy to understand, firm, and (if set as we suggest) low cap on how much a
 relay can inflate its measured capacity.
@@ -433,21 +429,19 @@ the remaining 75%+ capacity for measurement traffic. Instead the relay ceases
 carrying background traffic, uses all 100 Mbit/s of capacity to handle
 measurement traffic, and reports ~33 Mbit/s of background traffic (33/133 =
 ~25%). FlashFlow would trust this and consider the relay capable of 133
-Mbit/s. (If the relay were to report more than ~33 Mbit/s, FlashFlow caps them
-down to just ~33 Mbit/s.) With r=25%, FlashFlow only allows 1.33x weight
+Mbit/s. (If the relay were to report more than ~33 Mbit/s, FlashFlow limits it
+to just ~33 Mbit/s.) With r=25%, FlashFlow only allows 1.33x weight
 inflation.
 
 Prior work shows that Torflow allows weight inflation by a factor of 89x [0]
 or even 177x [1].
 
-The ratio chosen is a trade off between impact on background traffic and
+The ratio chosen is a tradeoff between impact on background traffic and
 security: r=50% allows a relay to double its weight but won't impact client
-traffic for relays with steady state throughput below 50%, while r=10% allows
-a very low inflation factor but will cause throttling of client traffic at far
-more relays.
-
-We feel r=25% (thus 1.33x inflation) is reasonable for initial deployment.
-Longer term, other ratios can be explored.
+traffic for relays with steady state throughput below 50%, while r=10% allows a
+very low inflation factor but will cause throttling of client traffic at far
+more relays. We suggest r=25% (and thus 1/(1-0.25)=1.33x inflation) for a
+reasonable tradeoff between performance and security.
 
 It may be possible to catch relays performing this attack, especially if they
 literally drop all background traffic during the measurement: have the
@@ -470,9 +464,9 @@ proposals.
 
 X. FlashFlow measurement system: Long term
 
-In the long term, finishing-touch development work will be done and
-experiments will be run to determine the best way to integrate FlashFlow into
-the Tor ecosystem.
+In the long term, finishing-touch development work will be done, including
+adding authentication and measurement scheduling, and experiments will be run to
+determine the best way to integrate FlashFlow into the Tor ecosystem.
 
 Any development changes needed during this time would go through separate
 proposals.
