@@ -77,7 +77,7 @@ be created. This section is divided into three parts: first a discussion of
 changes/additions that logically reside entirely within tor (essentially:
 relay-side modifications), second a discussion of the separate FlashFlow
 code that also requires some amount of tor changes (essentially: measurer-side
-modifications), and third a security discussion.
+and coordinator-side modifications), and third a security discussion.
 
 X.X Little-T Tor Components
 
@@ -144,8 +144,8 @@ The measure commands are:
   3 -- MSM_BG        [backward]
   4 -- MSM_ERR       [forward and backward]
 
-Forward cells are sent from the Tor measurement client to the relay. Backward
-cells are sent from the relay to the Tor measurement client.
+Forward cells are sent from the measurer/coordinator to the relay. Backward
+cells are sent from the relay to the measurer/coordinator.
 
 PARAMS and PARAMS_OK are used during the pre-measurement stage to tell the
 target what to expect and for the relay to positively acknowledge the message.
@@ -169,36 +169,34 @@ incoming cell matches.
 
 X.X.X Pre-Measurement Handshaking/Starting a Measurement
 
-Measurers start connecting to the target relay and each sends it a MSM_PARAMS
-cell. If the target is unwilling to be measured at this time, it responds with
+The coordinator connects to the target relay and sends it a MSM_PARAMS cell.
+If the target is unwilling to be measured at this time, it responds with
 an error cell and closes the connection.  Otherwise it checks that the
 parameters of the measurement are acceptable (e.g. the length isn't too long,
 the indicated relay identity is its own, etc.). Initially, this will always be
 true. If the target is happy, it sends a MSM_PARAMS_OK, otherwise it sends a
 MSM_ERR and closes the connection.
 
-Upon receiving a MSM_PARAMS_OK from the target, the measurer will open the
-remaining sockets with the target. If it receives a MSM_ERR, it reports the
-error to the coordinator and considers the measurement a failure.  The target
-needs to treat connections from measurers as special and not count them in the
-DoS detection algorithm.
+Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
+the measurers to open their TCP connections with the target. If the
+coordinator or any measurer receives a MSM_ERR, it reports the error to the
+coordinator and considers the measurement a failure.  The target needs to
+treat connections from measurers as special and not count them in the DoS
+detection algorithm.
 
 The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
-  - num_conns    [2 bytes]
-  - msm_duration [1 byte]
-  - bg_conn      [1 byte]
+  - msm_duration  [1 byte]
+  - num_measurers [1 byte]
+  - measurer_info [num_measurers times]
+    - tls_identity  [XXX bytes]
+    - num_conns     [2 bytes]
 
-num_conns is the total number of TCP connections this measurer will open with
-the target for this measurement. msm_duration is the duration, in seconds, that
-the actual measurement will last.  bg_conn is a flag indicating whether or not
-this connection is to be used for background traffic reports (MSM_BG cells)
-instead of MSM_ECHO traffic.
-
-[XXX Do MSM_BG cells really need their own connection? If we do that, should
-it be considered a "control connection"? What else would the control
-connection be used for?
-https://github.com/pastly/torspec/pull/1#discussion_r397472928]
+msm_duration is the duration, in seconds, that the actual measurement will
+last.  num_measurers is how many measurers, identified by their TLS
+identities, will be connecting. For each measurer, the tls_identity is
+provided as well as num_conns, the number of TCP connections that measurer
+will open with target.
 
 MSM_PARAMS_OK has no payload: it's just padding bytes to make the cell 514
 bytes long.
@@ -316,7 +314,7 @@ Notable new things that internal tor code will need to do on the measurer
 X.X.X.X Open many connections
 
 FlashFlow prototypes needed to "hack in" a flag in the
-open-a-connection-with-this-relay function call change that indicated whether
+open-a-connection-with-this-relay function call chain that indicated whether
 or not we wanted to force a new connection to be created. Most of Tor doesn't
 care if it reuses an existing connection, but FF does want to create many
 different connections. The cleanest way to accomplish this will be
@@ -494,12 +492,15 @@ proposals.
 
 X.X Authentication to Target Relay
 
-FlashFlow measurers will maintain TLS identity certificates and use them when
-connecting to target Tor relays. Dirauths will vote on which measurers are
-allowed to perform measurements in the same way they currently vote on
-recommended tor versions. Relays will update from stub authentication
-methods to methods that actually check that the measurer used a client TLS
-certificate and that it's listed in the consensus.
+FlashFlow coordinators and measurers will maintain TLS identity certificates
+and use them when connecting to target Tor relays. Dirauths will vote on which
+coordinators are allowed to perform measurements in the same way they
+currently vote on recommended tor versions. In the MSM_PARAMS cell,
+the coordinator list the TLS identities of the measurers the relay should
+expect to connect to it to perform the measurement. Relays will update from
+stub authentication methods to methods that (1) actually check that the
+dirauths have agreed to allow the coordinator to perform measurements, and (2)
+the measurers are listed in the coordinator's MSM_PARAMS cell.
 
 X.X Experiments
 
