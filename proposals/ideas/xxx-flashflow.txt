@@ -31,9 +31,9 @@ steps:
      capacity of the relay.
 
 FlashFlow performs a measurement of every relay according to a schedule
-described later in this document. Periodically it produces a v3bw file
-suitable for consumption by a Tor directory authority to make it a voting
-"bandwidth authority."
+described later in this document. Periodically it produces relay capacity
+estimates in the form of a v3bw file suitable for consumption by a Tor directory
+authority to make it a voting "bandwidth authority."
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
 the entire existing Tor network from scratch while Torflow takes 2 days;
@@ -165,7 +165,7 @@ realistic cryptographic CPU load. The measurer usually skips encrypting ECHO
 cells to reduce its own CPU load; however, to verify the relay is actually
 correctly decrypting all cells, the measurer will choose random outgoing
 cells, encrypt them, remember the ciphertext, and verify the corresponding
-incoming cell matches. 
+incoming cell matches.
 
 X.X.X Pre-Measurement Handshaking/Starting a Measurement
 
