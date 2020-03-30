@@ -73,7 +73,7 @@ X. FlashFlow measurement system: Short term
 
 The core measurement mechanics will be implemented in little-t tor, but a
 separate codebase for the FlashFlow side of the measurement system will also
-be created. This section is divided into free parts: first a discussion of
+be created. This section is divided into three parts: first a discussion of
 changes/additions that logically reside entirely within tor (essentially:
 relay-side modifications), second a discussion of the separate FlashFlow
 code that also requires some amount of tor changes (essentially: measurer-side
@@ -88,7 +88,7 @@ side:
   - New cell types.
   - Pre-measurement handshaking (with authentication reduced to stub methods
     that always indicate successful verification).
-  - Measurment mode, during which the relay will echo traffic with measurers,
+  - Measurement mode, during which the relay will echo traffic with measurers,
     set a cap on the amount of background traffic it transfers, and report the
     amount of transferred background traffic.
 
