@@ -203,10 +203,6 @@ The payload of MSM_ECHO cells:
 
   - arbitrary bytes [max to fill up 514 byte cell]
 
-[XXX it's possible while implementing the verification of MSM_ECHO cells that
-it will be discovered that it will be impossible to allow the measurer to skip
-encryption of most cells while requiring the relay to decrypt all cells]
-
 The payload of MSM_BG cells:
 
   - second        [1 byte]
