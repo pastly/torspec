@@ -235,7 +235,7 @@ The relay considers the measurement to have started the moment it receives the
 first MSM_ECHO cell from any measurer. At this point, the relay
 
   - starts a repeating 1s timer on which it will report the amount of
-    background traffic on the appropriate connection.
+    background traffic to the coordinator over the coordinator's connection.
   - enters "measurement mode" and limits the amount of background traffic it
     handles according to the torrc option/consensus parameter.
 
