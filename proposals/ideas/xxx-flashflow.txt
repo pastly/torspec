@@ -505,7 +505,7 @@ Thus the odds the adversary can cheat in `X` consecutive buckets are
 In our case, X will be highly varied: Slow relays won't see very many
 buckets, but fast relays will. The damage to the network a very slow relay can
 do by faking being only slightly faster is limited. Nonetheless, for now we
-motivate the selection of bucket size, with a slow relay:
+motivate the selection of bucket_size with a slow relay:
 
   - Assume a very slow relay of 1 Mbit/s capacity that will cheat 1 cell in
     each bucket. Assume a 30 second measurement.
