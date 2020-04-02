@@ -291,63 +291,40 @@ section:
 
 X.X.X.X Measurement Schedule
 
-[XXX
-    Give up for now on deciding exactly what to do for a measurement schedule
-    in the short term. The simple idea as written is nice ... because it's
-    simple. Easily implementable. But it has the problem that long-running
-    relays get measured at about the same time every day. Relays will know
-    when they're going to get measured, and if they can detect when others
-    get measured, they could DoS them during measurement time to hurt their
-    measurement.
+The short term implementation of measurement scheduling will be simplier than
+the long term one due to (1) there only being one FlashFlow deployment, and
+(2) there being very few relays that support being measured by FlashFlow. In
+fact the FF coordinator will maintain a list of the relays that actually
+support being measured, have opted in to being measured, and will only measure
+them.
 
-    The long term plan, as written, doesn't seem to handle non-new relays
-    that weren't running at the start of the 24hr measurement period. When
-    do they get scheduled in? ASAP? A random time from now till the end of
-    the day? Won't this lead to a large number of measurement clumped up at
-    the end of the day? What if there aren't any more slots open from now
-    till the end of the day?
+The coordinator divides time into a series of 24 hour periods, commonly
+referred to as days. Each period has measurement slots that are longer than a
+measurement lasts (30s), say 60s, to account for handshaking and recovery
+after a measurement is completed. Thus with 60s slots there's 1,440 slots in a
+day.
 
-    I was trying to come up with something else but never got it fully-formed
-    in my mind. Something along the lines of this:
-
-    A new consensus comes in. Schedule relays to be measured randomly
-    throughout the next 6 hours wherever there is an open slot. If the
-    relay is no longer around when its measurement time comes, whatever
-    no big deal. Consensuses come in every hour; each one has its own
-    6 hour window into the future; they overlap with each other but the
-    coord doesn't overcommit a slot. It's fine.
-
-    I think this addresses my main concerns. I'm not sure if this can
-    be done with multiple FF deployments with a shared random value like
-    the paper calls for. I also wonder if it's too complicated for short
-    term.
-XXX]
-
-The way a FF coordinator schedules measurements in the short term, describe
-here, is purposefully simpler than the long term plan for measurement
-scheduling. See Section [XXX] for the long term plan.
-
-The coordinator considers all running relays that haven't been measured in the
-last 24 hours. From this list of relays, it repeatedly takes the relay with
-the largest existing capacity estimate for which there is still sufficient
-unassigned measurer capacity to measure. Once there is not enough remaining
-measurer capacity to measure any more relays, the coordinator instructs the
-measurers to measure this set of relays. When these measurements are done
-(successful or otherwise), the coordinator records the results and repeats the
-process. If all relays have been measured (successfully or otherwise) in the
-last 24 hours, the coordinator waits for a new consensus. If the new consensus
-lacks relays that need measuring, it continues waiting.
+At the start of each day the coordinator consider the list of relays that have
+opted in to being measured.  From this list of relays, it repeatedly takes the
+relay with the largest existing capacity estimate. It selects a random slot.
+If the slot has existing relays assigned to it, the coordinator makes sure
+there is enough additional measurer capacity to handle this relay. If so, it
+assigns this relay to this slot. If not, it keeps picking new random slots
+until one has sufficient additional measurer capacity.
 
 Relays without existing capacity estimates are assumed to have the 75th
 percentile capacity of the current network.
 
+If a relay is not online when it's scheduled to be measured, it just doesn't
+get measured for that day.
+
 X.X.X.X.X Example
 
 Assume the FF deployment has 1 Gbit/s of measurer capacity.  Assume the chosen
-multiplier m=2.
+multiplier m=2. Assume there are only 5 slots in a measurement period.
 
-Consider a set of relays with the following existing capacity estimates that
-have not been measured in the last 24 hours.
+Consider a set of relays with the following existing capacity estimates and
+that have opted in to being measured by FlashFlow.
 
   - 500 Mbit/s
   - 300 Mbit/s
@@ -356,28 +333,42 @@ have not been measured in the last 24 hours.
   - 100 Mbit/s
   -  50 Mbit/s
 
-First round:
+The coordinator takes the largest relay, 500 Mbit/s, and picks a random slot
+for it. It picks slot 3.  The coordinator takes the next largest, 300, and
+randomly picks slot 2. The slots are now:
 
-The coordinator would take the 500 Mbit/s relay as it is the largest
-unmeasured. It assigns 500 * 2 = 1000 Mbit/s of measurer capacity to it.
-It's out of measurer capacity so this round is full. The measurers measure
-this relay.
+     0   |   1   |   2   |   3   |   4
+  -------|-------|-------|-------|-------
+         |       |  300  |  500  |
+         |       |       |       |
 
-Second round:
+The coordinator takes the next largest, 250, and randomly picks slot 2.  Slot 2
+already has 600 Mbit/s of measurer capacity reserved (300*m); given just 1000
+Mbit/s of total measurer capcity, there is just 400 Mbit/s of spare capacity
+while this relay requires 500 Mbit/s. There is not enough room in slot 2 for
+this relay. The coordinator picks a new random slot, 0.
 
-The next largest relay is 300 Mbit/s, so 600 Mbit/s of measurer capacity is
-assigned to it. That leaves 400 Mbit/s of capacity. That is not enough to
-measure the 250 Mbit/s relay (250 * 2 == 500), so the next largest is
-considered. There is enough for the 200 Mbit/s relay, so it all 400 Mbit/s of
-measurer capacity assigned to it. This round is full. The measurers measure
-these 2 relays.
+     0   |   1   |   2   |   3   |   4
+  -------|-------|-------|-------|-------
+    250  |       |  300  |  500  |
+         |       |       |       |
 
-Third round:
+The next largest is 200 and the coordinator randomly picks slot 2 again
+(wow!). As there is just enough spare capacity, the coordinator assigns this
+relay to slot 2.
 
-The next largest relay is 250 Mbit/s so 500 Mbit/s of measurer capacity is
-assigned to it. The next largest is 100, so 200 is assigned to it. The last is
-50, so 100 is assigned to it. 500+200+100 = 800 Mbit/s of measurer capacity is
-assigned. There are no more relays, so the measurers measure these 3 relays.
+     0   |   1   |   2   |   3   |   4
+  -------|-------|-------|-------|-------
+    250  |       |  300  |  500  |
+         |       |  200  |       |
+
+The coordinator randomly picks slot 4 for the last remaining relays, in
+that order.
+
+     0   |   1   |   2   |   3   |   4
+  -------|-------|-------|-------|-------
+    250  |       |  300  |  500  |  100
+         |       |  200  |       |   50
 
 X.X.X.X Generating V3BW files
 
@@ -572,19 +563,6 @@ measurer (or some party on its behalf) create a regular stream through the
 relay and measure the throughput on the stream before/during/after the
 measurement. This can be explored longer term.
 
-X.X.X Measurement Schedule
-
-Consider a relay that runs continuously. The FF coordinator measures it once a
-day. Due to the simplistic nature of the short term FF measurement scheduling
-algorithm, FF will measure the relay at approximately the same time every day:
-just after the relay passes 24 hours since the last measurement.
-
-Consequently, a relay has a good idea for when it will be measured next, and
-it need only support a high capacity during that time. Thus if the provider
-offers, various bandwidth packages, the relay operator can pay for the
-cheapest option the majority of the time yet obtain a weight corresponding to
-a much more expensive capacity.
-
 X. FlashFlow measurement system: Medium term
 
 The medium term deployment stage begins after FlashFlow has been implemented
@@ -623,9 +601,10 @@ X.X Measurement Scheduling
 
 Short term deployment only has one FF deployment running. Long term this may
 no longer be the case. FF deployments will need to coordinate between
-themselves to not measure the same relay at the same time, and in the long
-term there will be time to implement a secure measurement schedule, such as
-the following (quoted from Section 4.3 of the FlashFlow paper):
+themselves to not measure the same relay at the same time,
+and to handle new relays as they join during the middle of a measurement
+period (during the day).
+The following is quoted from Section 4.3 of the FlashFlow paper.
 
     To measure all relays in the network, the BWAuths periodically determine the
     measurement schedule. The schedule determines when and by whom a relay should
