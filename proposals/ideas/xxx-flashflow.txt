@@ -704,6 +704,9 @@ X.X Other Changes/Investigations/Ideas
   traffic.
 - What to do about co-located relays. Can they be detected reliably? Should we
   just add a torrc option a la MyFamily for co-located relays?
+- What is the explanation for dennis.jackson's scary graphs in this [2]
+  ticket?  Was it because of the speed test? Why? Will FlashFlow produce the
+  same behavior?
 
 X. Citations
 
@@ -712,3 +715,5 @@ X. Citations
 [1] A. Johnson, R. Jansen, N. Hopper, A. Segal, and P. Syverson. PeerFlow:
     Secure Load Balancing in Tor. Proceedings on Privacy Enhancing Technologies
     (PoPETs), 2017(2), April 2017.
+[2] Mike Perry: Graph onionperf and consensus information from Rob's experiments
+    https://trac.torproject.org/projects/tor/ticket/33076
