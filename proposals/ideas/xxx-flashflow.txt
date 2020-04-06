@@ -25,7 +25,7 @@ steps:
      The target relay also reports the amount of per-second background
      (non-measurement) traffic.
   X. The authority node sums the per-second reported throughputs into 30 sums
-     (one for each second) and calculates the median. This is estimated
+     (one for each second) and calculates the median. This is the estimated
      capacity of the relay.
 
 FlashFlow performs a measurement of every relay according to a schedule
