@@ -292,7 +292,7 @@ section:
 
 X.X.X.X Measurement Schedule
 
-The short term implementation of measurement scheduling will be simplier than
+The short term implementation of measurement scheduling will be simpler than
 the long term one due to (1) there only being one FlashFlow deployment, and
 (2) there being very few relays that support being measured by FlashFlow. In
 fact the FF coordinator will maintain a list of the relays that actually
@@ -380,7 +380,7 @@ many CPU cycles on random slot picking.
 Assume a large number of relays opt in to being measured. We consider 50 and
 200 here.  Assume the measurement period is 1 day. Assume the slots are 60
 seconds each.  Thus 1,440 slots. Assume there can only be 1 relay per slot
-(this is not the case, but it is the worst case and makes analysis simplier).
+(this is not the case, but it is the worst case and makes analysis simpler).
 
 The probability of picking an empty slot for the i'th relay where n is the
 number of slots is 1-i/n. The probability of never picking the same slot twice
