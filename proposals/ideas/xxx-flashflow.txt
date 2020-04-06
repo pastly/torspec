@@ -304,7 +304,7 @@ measurement lasts (30s), say 60s, to account for handshaking and recovery
 after a measurement is completed. Thus with 60s slots there's 1,440 slots in a
 day.
 
-At the start of each day the coordinator consider the list of relays that have
+At the start of each day the coordinator considers the list of relays that have
 opted in to being measured.  From this list of relays, it repeatedly takes the
 relay with the largest existing capacity estimate. It selects a random slot.
 If the slot has existing relays assigned to it, the coordinator makes sure
