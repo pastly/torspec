@@ -34,15 +34,15 @@ estimates in the form of a v3bw file, which is suitable for consumption by a Tor
 directory and allows FlashFlow to be a voting "bandwidth authority."
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
-the entire existing Tor network from scratch (with 3 Gbit/s measurer capacity) while Torflow takes 2 days;
-FlashFlow measures relays it hasn't seen recently as soon as it learns about
-them (i.e. every new consensus) while Torflow can take a day or more; and
-FlashFlow accurately measures new high-capacity relays the first time and
-every time while Torflow takes days/weeks to assign them their full fair share
-of bandwidth (especially for non-exits). FlashFlow is more secure than
-Torflow: FlashFlow allows a relay to inflate its measured capacity by up to
-1.33x (configured by a parameter) while Torflow allows weight inflation by a
-factor of 89x [0] or even 177x [1].
+the entire existing Tor network from scratch (with 3 Gbit/s measurer capacity)
+while Torflow takes 2 days; FlashFlow measures relays it hasn't seen recently
+as soon as it learns about them (i.e. every new consensus) while Torflow can
+take a day or more; and FlashFlow accurately measures new high-capacity relays
+the first time and every time while Torflow takes days/weeks to assign them
+their full fair share of bandwidth (especially for non-exits). FlashFlow is
+more secure than Torflow: FlashFlow allows a relay to inflate its measured
+capacity by up to 1.33x (configured by a parameter) while Torflow allows
+weight inflation by a factor of 89x [0] or even 177x [1].
 
 [XXX A paragraph summarizing the layout of this proposal. Put off for now as
 it might change.]
@@ -53,8 +53,8 @@ FlashFlow's deployment shall be broken up into three stages.
 
 In the short term we want to implement a working FlashFlow measurement system.
 This requires code changes in little-t tor and an external FlashFlow codebase.
-The majority of the implementation work will be done in the short term, and the product is
-a complete FlashFlow measurement system. Remaining pieces (e.g.
+The majority of the implementation work will be done in the short term, and
+the product is a complete FlashFlow measurement system. Remaining pieces (e.g.
 authentication) are added later for enhanced security and network performance.
 
 In the medium term we want to begin collecting data with a FlashFlow
