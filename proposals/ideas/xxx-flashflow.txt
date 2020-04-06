@@ -1,6 +1,6 @@
 Filename: xxx-flashflow.txt
 Title: FlashFlow: A Secure Speed Test for Tor (Parent Proposal)
-Author: Matthew Traudt, Rob Jansen, Aaron Johnson
+Author: Matthew Traudt, Rob Jansen, Aaron Johnson, Mike Perry
 Created: __________
 Status: Draft
 
