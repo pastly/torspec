@@ -565,6 +565,50 @@ measurer (or some party on its behalf) create a regular stream through the
 relay and measure the throughput on the stream before/during/after the
 measurement. This can be explored longer term.
 
+X.X.X Lack of Authentication
+
+In the short term FlashFlow implementation, if a relay enables the torrc
+option to allow itself to be measured, anyone can measure it. Proper
+authentication is deferred to the long term.
+
+The damage that can be done:
+
+  - Force the relay to open a larger number of sockets in an attempt to
+    exhaust them.
+  - Force the relay to receive and transmit a large amount of "measurement"
+    traffic, consuming bandwidth and CPU capacity.
+  - Force the relay to de-prioritize existing client traffic.
+
+Other than the fact that by default relays do **not** allow themselves to be
+measured, the damage is further limited by:
+
+  - The consensus parameter/torrc option governing the maximum length of a
+    measurement. We suggest a default value for this option of 45 seconds
+    (including setup time), and the actual measurement to last 30 seconds. With
+    our suggested default value a relay cannot be in measurement mode for more
+    than 45 seconds.
+
+  - The consensus parameter/torrc option governing the target ratio of
+    background client traffic and measurement traffic. We suggest a default
+    value of 25%, meaning for every 3 bytes of measurement traffic 1 byte of
+    client traffic can be sent. A malicious FlashFlow deployment cannot coerce
+    the relay to alter this value: the relay sets it based on the consensus,
+    its torrc, or the default 25% if nothing else.
+
+  - Even if the malicious FlashFlow deployment sends little or no measurement
+    traffic to constrain the amount of client traffic the relay will handle
+    during the measurement, honest relays will always send background traffic
+    as if they are seeing some minimum amount of measurement traffic. We
+    suggest 10 Mbit/s of measurement traffic is always assumed present.
+
+  - The consensus parameter/torrc option limiting the frequency with which
+    relays will allow themselves to be measured. We suggest a measurement
+    period of 1 day. Thus a relay can expect to be measured 0, 1, or 2 times
+    in any sliding 24 hour window, thus it won't allow itself to be measured
+    more than twice in 24 hours. A malicious FlashFlow deployment can attempt
+    a "measurement" repeatedly, say every hour, thereby locking out the honest
+    FlashFlow deployment.
+
 X. FlashFlow measurement system: Medium term
 
 The medium term deployment stage begins after FlashFlow has been implemented
