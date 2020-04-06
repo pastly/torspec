@@ -702,6 +702,8 @@ X.X Other Changes/Investigations/Ideas
   more allowed bg traffic?)
 - Catching relays inflating their measured capacity by dropping background
   traffic.
+- What to do about co-located relays. Can they be detected reliably? Should we
+  just add a torrc option a la MyFamily for co-located relays?
 
 X. Citations
 
