@@ -295,8 +295,8 @@ The short term implementation of measurement scheduling will be simplier than
 the long term one due to (1) there only being one FlashFlow deployment, and
 (2) there being very few relays that support being measured by FlashFlow. In
 fact the FF coordinator will maintain a list of the relays that actually
-support being measured, have opted in to being measured, and will only measure
-them.
+support being measured and have opted in to being measured, and it will only
+measure them.
 
 The coordinator divides time into a series of 24 hour periods, commonly
 referred to as days. Each period has measurement slots that are longer than a
