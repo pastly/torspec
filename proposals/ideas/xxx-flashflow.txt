@@ -4,27 +4,27 @@ Author: Matthew Traudt, Aaron Johnson, Rob Jansen, Mike Perry
 Created: __________
 Status: Draft
 
-X. Introduction
+1. Introduction
 
 FlashFlow is a new distributed bandwidth measurement system for Tor that
 consists of a single authority node ("coordinator") instructing one or more
 measurement nodes ("measurers") when and how to measure Tor relays. A
 measurement consists of the following steps:
 
-  X. The measurement nodes demonstrate to the target relay permission to
+  1. The measurement nodes demonstrate to the target relay permission to
      perform measurements.
-  X. The measurement nodes open many TCP connections to the target relay and
+  2. The measurement nodes open many TCP connections to the target relay and
      create a one-hop circuit to the target relay on each one.
-  X. For 30 seconds the measurement nodes send measurement cells to the
+  3. For 30 seconds the measurement nodes send measurement cells to the
      target relay and verify that the cells echoed back match the ones sent.
      During this time the relay caps the amount of background traffic it
      transfers. Background and measurement traffic are handled separately at
      the relay.
-  X. For every second during the measurement, the measurement nodes report to
+  4. For every second during the measurement, the measurement nodes report to
      the authority node how much traffic was echoed back.
      The target relay also reports the amount of per-second background
      (non-measurement) traffic.
-  X. The authority node sums the per-second reported throughputs into 30 sums
+  5. The authority node sums the per-second reported throughputs into 30 sums
      (one for each second) and calculates the median. This is the estimated
      capacity of the relay.
 
@@ -49,7 +49,7 @@ weight inflation by a factor of 89x [0] or even 177x [1].
 [XXX A paragraph summarizing the layout of this proposal. Put off for now as
 it might change.]
 
-X. Deployment Stages
+2. Deployment Stages
 
 FlashFlow's deployment shall be broken up into three stages.
 
@@ -71,7 +71,7 @@ sbws but use FF's results as a better estimate of relay capacity than observed
 bandwidth. Authentication and other FlashFlow features necessary to make it
 completely ready for full production deployment will be worked on here.
 
-X. FlashFlow measurement system: Short term
+3. FlashFlow measurement system: Short term
 
 The core measurement mechanics will be implemented in little-t tor, but a
 separate codebase for the FlashFlow side of the measurement system will also
@@ -81,7 +81,7 @@ relay-side modifications), second a discussion of the separate FlashFlow
 code that also requires some amount of tor changes (essentially: measurer-side
 and coordinator-side modifications), and third a security discussion.
 
-X.X Little-T Tor Components
+3.1 Little-T Tor Components
 
 The primary additions/changes that entirely reside within tor on the relay
 side:
@@ -94,7 +94,7 @@ side:
     set a cap on the amount of background traffic it transfers, and report the
     amount of transferred background traffic.
 
-X.X.X Parameters
+3.1.1 Parameters
 
 FlashFlow will require some consensus parameters/torrc options. Each has some
 default value if nothing is specified; the consensus parameter overrides this
@@ -134,7 +134,7 @@ Note this duration includes handshake time, thus it necessarily is larger than
 the expected actual measurement duration.  Possible values are in the range
 [10, 120] inclusive. Default: 45.
 
-X.X.X New Cell Types
+3.1.2 New Cell Types
 
 FlashFlow will introduce a new cell command MEASURE.
 
@@ -175,7 +175,7 @@ correctly decrypting all cells, the measurer will choose random outgoing
 cells, encrypt them, remember the ciphertext, and verify the corresponding
 incoming cell matches.
 
-X.X.X Pre-Measurement Handshaking/Starting a Measurement
+3.1.3 Pre-Measurement Handshaking/Starting a Measurement
 
 The coordinator connects to the target relay and sends it a MSM_PARAMS cell.
 If the target is unwilling to be measured at this time or if the coordinator
@@ -244,7 +244,7 @@ The error string is optional in all cases. It isn't present if the first byte
 of err_str is null, otherwise it is present. It ends at the first null byte or
 the end of the cell, whichever comes first.
 
-X.X.X Measurement Mode
+3.1.4 Measurement Mode
 
 The relay considers the measurement to have started the moment it receives the
 first MSM_ECHO cell from any measurer. At this point, the relay
@@ -271,7 +271,7 @@ scheduling round. The target will enforce that a minimum of 10 Mbit/s of
 measurement traffic is recorded since the last background traffic scheduling
 round, to ensure it always allows some minimum amount of background traffic.
 
-X.X FlashFlow Components
+3.2 FlashFlow Components
 
 The FF coordinator and measurer code will reside in a FlashFlow repository
 separate from little-t tor.
@@ -291,7 +291,7 @@ The rest of this section first discusses notable functions of the FlashFlow
 coordinator, then goes on to discuss FF measurer code that will require
 supporting tor code.
 
-X.X.X FlashFlow Coordinator
+3.2.1 FlashFlow Coordinator
 
 The coordinator is responsible for scheduling measurements, aggregating
 results, and producing v3bw files.
@@ -304,7 +304,7 @@ section:
   - schedule measurements.
   - v3bw file generation.
 
-X.X.X.X Measurement Schedule
+3.2.1.1 Measurement Schedule
 
 The short term implementation of measurement scheduling will be simpler than
 the long term one due to (1) there only being one FlashFlow deployment, and
@@ -333,7 +333,7 @@ percentile capacity of the current network.
 If a relay is not online when it's scheduled to be measured, it just doesn't
 get measured for that day.
 
-X.X.X.X.X Example
+3.2.1.1.1 Example
 
 Assume the FF deployment has 1 Gbit/s of measurer capacity.  Assume the chosen
 multiplier m=2. Assume there are only 5 slots in a measurement period.
@@ -385,7 +385,7 @@ that order.
     250  |       |  300  |  500  |  100
          |       |  200  |       |   50
 
-X.X.X.X Generating V3BW files
+3.2.1.2 Generating V3BW files
 
 Every hour the FF coordinator produces a v3bw file in which it stores the
 latest capacity estimate for every relay it has measured in the last week. The
@@ -402,7 +402,7 @@ symbolic link at a static path will always point to the latest v3bw file.
     v3bw.2020-03-01-04-00-00
     v3bw.2020-03-01-05-00-00
 
-X.X.X FlashFlow Measurer
+3.2.2 FlashFlow Measurer
 
 The measurers take commands from the coordinator, connect to target relays
 with many sockets, send them traffic, and verify the received traffic is the
@@ -418,10 +418,10 @@ housing a lot of this code is the best idea.]
 Notable new things that internal tor code will need to do on the measurer
 (client) side:
 
-  X. Open many TLS+TCP connections to the same relay on purpose
-  X. Verify echo cells
+  1. Open many TLS+TCP connections to the same relay on purpose
+  2. Verify echo cells
 
-X.X.X.X Open many connections
+3.2.2.1 Open many connections
 
 FlashFlow prototypes needed to "hack in" a flag in the
 open-a-connection-with-this-relay function call chain that indicated whether
@@ -433,7 +433,7 @@ investigated.
 On the relay side, these measurer connections do not count towards DoS
 detection algorithms.
 
-X.X.X.X Verify echo cells
+3.2.2.2 Verify echo cells
 
 A parameter will exist to tell the measurers with what frequency they shall
 verify that cells echoed back to them match what was sent. This parameter does
@@ -454,7 +454,7 @@ recorded sent cell. If they match, no special action is taken. If they don't
 match, the measurer indicates failure to the coordinator and target relay and
 closes all connections, ending the measurement.
 
-X.X.X.X.X Example
+3.2.2.2.1 Example
 
 Consider bucket_size is 1000. For the moment ignore cell encryption.
 
@@ -472,7 +472,7 @@ Consider the receive side now. It counts the cells it receives. At receive
 idx=640, it checks the received cell matches the saved cell from before. At
 receive idx=1236, it again checks the received cell matches. Etc.
 
-X.X.X.X.X Motivation
+3.2.2.2.2 Motivation
 
 A malicious relay may want to skip decryption of measurement cells to save CPU
 cycles and obtain a higher capacity estimate. More generally, it could
@@ -482,12 +482,12 @@ even sending.
 
 The security of echo cell verification is discussed in Security Section [XXX].
 
-X.X Security
+3.3 Security
 
 In this section we discuss the security of various aspects of FlashFlow and
 the tor changes it requires.
 
-X.X.X Echo Cell Verification: Bucket Size
+3.3.1 Echo Cell Verification: Bucket Size
 
 A smaller bucket size means more cells are checked and FF is more likely to
 detect a malicious target. It also means more bookkeeping overhead (CPU/RAM).
@@ -539,7 +539,7 @@ Slower relays can cheat more easily but the amount of extra weight they can
 obtain is insignificant in absolute terms. Faster relays are essentially
 unable to cheat.
 
-X.X.X Weight Inflation
+3.3.2 Weight Inflation
 
 Target relays are an active part of the measurement process; they know they
 are getting measured. While a relay cannot fake the measurement traffic, it
@@ -578,7 +578,7 @@ measurer (or some party on its behalf) create a regular stream through the
 relay and measure the throughput on the stream before/during/after the
 measurement. This can be explored longer term.
 
-X.X.X Incomplete Authentication
+3.3.3 Incomplete Authentication
 
 The short term FlashFlow implementation has the relay set two torrc options if
 they would like to allow themselves to be measured: a flag allowing
@@ -599,7 +599,7 @@ until the end of the measurement. The adversary could also pretend to be the
 measurer. Such an adversary could induce measurement failures and
 inaccuracies.
 
-X. FlashFlow measurement system: Medium term
+4. FlashFlow measurement system: Medium term
 
 The medium term deployment stage begins after FlashFlow has been implemented
 and relays are starting to update to a version of Tor that supports it.
@@ -612,7 +612,7 @@ and intermediate results.
 Any development changes needed during this time would go through separate
 proposals.
 
-X. FlashFlow measurement system: Long term
+5. FlashFlow measurement system: Long term
 
 In the long term, finishing-touch development work will be done, including
 adding authentication and measurement scheduling, and experiments will be run to
@@ -621,7 +621,7 @@ determine the best way to integrate FlashFlow into the Tor ecosystem.
 Any development changes needed during this time would go through separate
 proposals.
 
-X.X Authentication to Target Relay
+5.1 Authentication to Target Relay
 
 FlashFlow coordinators and measurers will maintain TLS certificates
 and use them when connecting to target Tor relays. Dirauths will vote on which
@@ -633,7 +633,7 @@ stub authentication methods to methods that (1) actually check that the
 dirauths have agreed to allow the coordinator to perform measurements, and (2)
 the measurers are listed in the coordinator's MSM_PARAMS cell.
 
-X.X Measurement Scheduling
+5.2 Measurement Scheduling
 
 Short term deployment only has one FF deployment running. Long term this may
 no longer be the case. FF deployments will need to coordinate between
@@ -664,11 +664,11 @@ The following is quoted from Section 4.3 of the FlashFlow paper.
     relays will continue to be measured, with new relays given secondary priority
     in the order they arrive.
 
-X.X Experiments
+5.3 Experiments
 
    [XXX todo]
 
-X.X Other Changes/Investigations/Ideas
+5.4 Other Changes/Investigations/Ideas
 
 - How can FlashFlow data be used in a way that doesn't lead to poor load
   balancing given the following items that lead to non-uniform client
@@ -698,7 +698,7 @@ X.X Other Changes/Investigations/Ideas
   ticket?  Was it because of the speed test? Why? Will FlashFlow produce the
   same behavior?
 
-X. Citations
+6. Citations
 
 [0] F. Thill. Hidden Service Tracking Detection and Bandwidth Cheating in Tor
     Anonymity Network. Master’s thesis, Univ. Luxembourg, 2014.
