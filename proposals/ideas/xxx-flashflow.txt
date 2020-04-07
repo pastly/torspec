@@ -102,11 +102,11 @@ FFMeasurementsAllowed: In lieu of a proper chain of authentication that gives
 FF measurers permission to perform measurements, this allows/disallows this
 relay to be measured by anyone. Possible values: 0, 1. Default: 0 (disallowed).
 
-FFAllowedCoordinators: the list of coordinator TLS identities that are allowed
-to start measurements. Relays check their torrc when they receive a connection
-from a FlashFlow coordinator to see if it's on the list. If they have no list,
-they check the consensus parameter. If nether exist, then no FlashFlow
-deployment is allowed to measure this relay. Default: empty list.
+FFAllowedCoordinators: the list of coordinator TLS certificates that are
+allowed to start measurements. Relays check their torrc when they receive a
+connection from a FlashFlow coordinator to see if it's on the list. If they
+have no list, they check the consensus parameter. If nether exist, then no
+FlashFlow deployment is allowed to measure this relay. Default: empty list.
 
 FFMeasurementPeriod: A relay should expect on average, to be measured by each
 FlashFlow deployment once each measurement period. A relay will not allow
@@ -177,11 +177,11 @@ X.X.X Pre-Measurement Handshaking/Starting a Measurement
 
 The coordinator connects to the target relay and sends it a MSM_PARAMS cell.
 If the target is unwilling to be measured at this time or if the coordinator
-didn't use a TLS client certificate that the target trusts, it responds with
-an error cell and closes the connection.  Otherwise it checks that the
-parameters of the measurement are acceptable (e.g. the version is acceptable,
-the length isn't too long, etc.).  If the target is happy, it sends a
-MSM_PARAMS_OK, otherwise it sends a MSM_ERR and closes the connection.
+didn't use a TLS certificate that the target trusts, it responds with an error
+cell and closes the connection.  Otherwise it checks that the parameters of
+the measurement are acceptable (e.g. the version is acceptable, the length
+isn't too long, etc.).  If the target is happy, it sends a MSM_PARAMS_OK,
+otherwise it sends a MSM_ERR and closes the connection.
 
 Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
 the measurers to open their TCP connections with the target. If the
@@ -619,11 +619,11 @@ proposals.
 
 X.X Authentication to Target Relay
 
-FlashFlow coordinators and measurers will maintain TLS identity certificates
+FlashFlow coordinators and measurers will maintain TLS certificates
 and use them when connecting to target Tor relays. Dirauths will vote on which
 coordinators are allowed to perform measurements in the same way they
 currently vote on recommended tor versions. In the MSM_PARAMS cell,
-the coordinator list the TLS identities of the measurers the relay should
+the coordinator list the TLS certificates of the measurers the relay should
 expect to connect to it to perform the measurement. Relays will update from
 stub authentication methods to methods that (1) actually check that the
 dirauths have agreed to allow the coordinator to perform measurements, and (2)
