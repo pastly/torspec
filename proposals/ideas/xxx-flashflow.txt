@@ -55,7 +55,8 @@ In the short term we want to implement a working FlashFlow measurement system.
 This requires code changes in little-t tor and an external FlashFlow codebase.
 The majority of the implementation work will be done in the short term, and
 the product is a complete FlashFlow measurement system. Remaining pieces (e.g.
-authentication) are added later for enhanced security and network performance.
+better authentication) are added later for enhanced security and network
+performance.
 
 In the medium term we want to begin collecting data with a FlashFlow
 deployment. The intermediate results and v3bw files produced will be made
@@ -101,6 +102,12 @@ FFMeasurementsAllowed: In lieu of a proper chain of authentication that gives
 FF measurers permission to perform measurements, this allows/disallows this
 relay to be measured by anyone. Possible values: 0, 1. Default: 0 (disallowed).
 
+FFAllowedCoordinators: the list of coordinator TLS identities that are allowed
+to start measurements. Relays check their torrc when they receive a connection
+from a FlashFlow coordinator to see if it's on the list. If they have no list,
+they check the consensus parameter. If nether exist, then no FlashFlow
+deployment is allowed to measure this relay. Default: empty list.
+
 FFMeasurementPeriod: A relay should expect on average, to be measured by each
 FlashFlow deployment once each measurement period. A relay will not allow
 itself to be measured more than twice by a FlashFlow deployment in any time
@@ -124,7 +131,6 @@ relay shall close all measurement connections and exit its measurement mode.
 Note this duration includes handshake time, thus it necessarily is larger than
 the expected actual measurement duration.  Possible values are in the range
 [10, 120] inclusive. Default: 45.
-
 
 X.X.X New Cell Types
 
@@ -170,12 +176,12 @@ incoming cell matches.
 X.X.X Pre-Measurement Handshaking/Starting a Measurement
 
 The coordinator connects to the target relay and sends it a MSM_PARAMS cell.
-If the target is unwilling to be measured at this time, it responds with
+If the target is unwilling to be measured at this time or if the coordinator
+didn't use a TLS client certificate that the target trusts, it responds with
 an error cell and closes the connection.  Otherwise it checks that the
-parameters of the measurement are acceptable (e.g. the length isn't too long,
-the indicated relay identity is its own, etc.). Initially, this will always be
-true. If the target is happy, it sends a MSM_PARAMS_OK, otherwise it sends a
-MSM_ERR and closes the connection.
+parameters of the measurement are acceptable (e.g. the version is acceptable,
+the length isn't too long, etc.).  If the target is happy, it sends a
+MSM_PARAMS_OK, otherwise it sends a MSM_ERR and closes the connection.
 
 Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
 the measurers to open their TCP connections with the target. If the
@@ -186,17 +192,20 @@ detection algorithm.
 
 The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
+  - version       [1 byte]
   - msm_duration  [1 byte]
   - num_measurers [1 byte]
   - measurer_info [num_measurers times]
-    - tls_identity  [XXX bytes]
-    - num_conns     [2 bytes]
+    - ipv4_addr   [4 bytes]
+    - num_conns   [2 bytes]
 
-msm_duration is the duration, in seconds, that the actual measurement will
-last.  num_measurers is how many measurers, identified by their TLS
-identities, will be connecting. For each measurer, the tls_identity is
-provided as well as num_conns, the number of TCP connections that measurer
-will open with target.
+version dictates how this MSM_PARAMS cell shall be parsed.  msm_duration is
+the duration, in seconds, that the actual measurement will last.
+num_measurers is how many measurer_info structs follow.  For each measurer,
+the ipv4_addr it will use when connecting to the target is provided, as is
+num_conns, the number of TCP connections that measurer will open with target.
+Future versions of FlashFlow and this cell type will use TLS certificates
+instead of IP addresses.
 
 MSM_PARAMS_OK has no payload: it's just padding bytes to make the cell 514
 bytes long.
@@ -236,9 +245,9 @@ X.X.X Measurement Mode
 The relay considers the measurement to have started the moment it receives the
 first MSM_ECHO cell from any measurer. At this point, the relay
 
-  - starts a repeating 1s timer on which it will report the amount of
+  - Starts a repeating 1s timer on which it will report the amount of
     background traffic to the coordinator over the coordinator's connection.
-  - enters "measurement mode" and limits the amount of background traffic it
+  - Enters "measurement mode" and limits the amount of background traffic it
     handles according to the torrc option/consensus parameter.
 
 The relay decrypts and echos back all MSM_ECHO cells it receives on
@@ -565,49 +574,26 @@ measurer (or some party on its behalf) create a regular stream through the
 relay and measure the throughput on the stream before/during/after the
 measurement. This can be explored longer term.
 
-X.X.X Lack of Authentication
+X.X.X Incomplete Authentication
 
-In the short term FlashFlow implementation, if a relay enables the torrc
-option to allow itself to be measured, anyone can measure it. Proper
-authentication is deferred to the long term.
+The short term FlashFlow implementation has the relay set two torrc options if
+they would like to allow themselves to be measured: a flag allowing
+measurement, and the list of coordinator TLS certificate that are allowed to
+start a measurement.
 
-The damage that can be done:
+The relay drops MSM_PARAMS cells from coordinators it does not trust,
+immediately followed by closing the connection. A FF coordinator cannot
+convince a relay to enter measurement mode unless the relay trusts its TLS
+certificate.
 
-  - Force the relay to open a larger number of sockets in an attempt to
-    exhaust them.
-  - Force the relay to receive and transmit a large amount of "measurement"
-    traffic, consuming bandwidth and CPU capacity.
-  - Force the relay to de-prioritize existing client traffic.
-
-Other than the fact that by default relays do **not** allow themselves to be
-measured, the damage is further limited by:
-
-  - The consensus parameter/torrc option governing the maximum length of a
-    measurement. We suggest a default value for this option of 45 seconds
-    (including setup time), and the actual measurement to last 30 seconds. With
-    our suggested default value a relay cannot be in measurement mode for more
-    than 45 seconds.
-
-  - The consensus parameter/torrc option governing the target ratio of
-    background client traffic and measurement traffic. We suggest a default
-    value of 25%, meaning for every 3 bytes of measurement traffic 1 byte of
-    client traffic can be sent. A malicious FlashFlow deployment cannot coerce
-    the relay to alter this value: the relay sets it based on the consensus,
-    its torrc, or the default 25% if nothing else.
-
-  - Even if the malicious FlashFlow deployment sends little or no measurement
-    traffic to constrain the amount of client traffic the relay will handle
-    during the measurement, honest relays will always send background traffic
-    as if they are seeing some minimum amount of measurement traffic. We
-    suggest 10 Mbit/s of measurement traffic is always assumed present.
-
-  - The consensus parameter/torrc option limiting the frequency with which
-    relays will allow themselves to be measured. We suggest a measurement
-    period of 1 day. Thus a relay can expect to be measured 0, 1, or 2 times
-    in any sliding 24 hour window, thus it won't allow itself to be measured
-    more than twice in 24 hours. A malicious FlashFlow deployment can attempt
-    a "measurement" repeatedly, say every hour, thereby locking out the honest
-    FlashFlow deployment.
+A trusted coordinator specifies in the MSM_PARAMS the IP addresses of the
+measurers the relay shall expect to connect to it shortly. The target adds the
+measurer IP addresses to a whitelist in the DoS connection limit system,
+exempting them from any configured connection limit.  If a measurer is behind
+a NAT, an adversary behind the same NAT can DoS the relay's available sockets
+until the end of the measurement. The adversary could also pretend to be the
+measurer. Such an adversary could induce measurement failures and
+inaccuracies.
 
 X. FlashFlow measurement system: Medium term
 
