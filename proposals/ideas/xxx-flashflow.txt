@@ -183,12 +183,14 @@ the measurement are acceptable (e.g. the version is acceptable, the length
 isn't too long, etc.).  If the target is happy, it sends a MSM_PARAMS_OK,
 otherwise it sends a MSM_ERR and closes the connection.
 
+Upon learning the IP addresses of the measurers from the coordinator in the
+MSM_PARAMS cell, the target whitelists their IPs in its DoS detection
+subsystem until the measurement ends (successfully or otherwise).
+
 Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
 the measurers to open their TCP connections with the target. If the
 coordinator or any measurer receives a MSM_ERR, it reports the error to the
-coordinator and considers the measurement a failure.  The target needs to
-treat connections from measurers as special and not count them in the DoS
-detection algorithm.
+coordinator and considers the measurement a failure.
 
 The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
@@ -426,7 +428,7 @@ care if it reuses an existing connection, but FF does want to create many
 different connections. The cleanest way to accomplish this will be
 investigated.
 
-On the relay side, these measurer connections need to not count towards DoS
+On the relay side, these measurer connections do not count towards DoS
 detection algorithms.
 
 X.X.X.X Verify echo cells
