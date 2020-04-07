@@ -7,9 +7,9 @@ Status: Draft
 X. Introduction
 
 FlashFlow is a new distributed bandwidth measurement system for Tor that
-consists of a single authority node instructing one or more measurement nodes
-when and how to measure Tor relays. A measurement consists of the following
-steps:
+consists of a single authority node ("coordinator") instructing one or more
+measurement nodes ("measurers") when and how to measure Tor relays. A
+measurement consists of the following steps:
 
   X. The measurement nodes demonstrate to the target relay permission to
      perform measurements.
@@ -30,8 +30,10 @@ steps:
 
 FlashFlow performs a measurement of every relay according to a schedule
 described later in this document. Periodically it produces relay capacity
-estimates in the form of a v3bw file, which is suitable for consumption by a Tor
-directory and allows FlashFlow to be a voting "bandwidth authority."
+estimates in the form of a v3bw file, which is suitable for direct consumption
+by a Tor directory authority. Alternatively an existing load balancing system
+such as Simple Bandwidth Scanner could be modified to use FlashFlow's v3bw
+file as input.
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to measure
 the entire existing Tor network from scratch (with 3 Gbit/s measurer capacity)
