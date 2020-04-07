@@ -493,8 +493,8 @@ the tor changes it requires.
 A smaller bucket size means more cells are checked and FF is more likely to
 detect a malicious target. It also means more bookkeeping overhead (CPU/RAM).
 
-An adversary that knows `bucket_size` and cheats on one item out of every
-`bucket_size` items will have a `1 / bucket_size` chance of getting caught in
+An adversary that knows bucket_size and cheats on one item out of every
+bucket_size items will have a 1/bucket_size chance of getting caught in
 the first bucket.  This is the worst case adversary. While cheating on just a
 single item per bucket yields very little advantage, cheating on more items
 per bucket increases the likelihood the adversary gets caught. Thus only the
@@ -505,7 +505,7 @@ are
 
     (bucket_size-1)/bucket_size
 
-Thus the odds the adversary can cheat in `X` consecutive buckets are
+Thus the odds the adversary can cheat in X consecutive buckets are
 
     [(bucket_size-1)/bucket_size]^X
 
@@ -516,14 +516,14 @@ motivate the selection of bucket_size with a slow relay:
 
   - Assume a very slow relay of 1 Mbit/s capacity that will cheat 1 cell in
     each bucket. Assume a 30 second measurement.
-  - The relay will handle `1 * 30` = 30 Mbit of traffic during the
+  - The relay will handle 1*30 = 30 Mbit of traffic during the
     measurement, or 3.75 MB, or 3.75 million bytes.
   - Cells are 514 bytes. Approximately (e.g. ignoring TLS) 7300 cells will be
     sent/recv over the course of the measurement.
-  - A `bucket_size` of 50 results in about 146 buckets over the course of the
+  - A bucket_size of 50 results in about 146 buckets over the course of the
     30s measurement.
   - Therefore, the odds of the adversary cheating successfully as
-    `(49/50)^(146)`, or about 5.2%.
+    (49/50)^(146), or about 5.2%.
 
 This sounds high, but a relay capable of double the bandwidth (2 Mbit/s) will
 have (49/50)^(2*146) or 0.2% odds of success, which is quite low.
@@ -531,9 +531,9 @@ have (49/50)^(2*146) or 0.2% odds of success, which is quite low.
 Wanting a <1% chance that a 10 Mbit/s relay can successfully cheat results in
 a bucket size of approximately 125:
 
-  - 10 * 30 = 300 Mbit of traffic during 30s measurement. 37.5 million bytes.
+  - 10*30 = 300 Mbit of traffic during 30s measurement. 37.5 million bytes.
   - 37,500,000 bytes / 514 bytes/cell = ~73,000 cells
-  - bucket size of 125 cells means 73,000 / 125 = 584 buckets
+  - bucket_size of 125 cells means 73,000 / 125 = 584 buckets
   - (124/125)^(584) = 0.918% chance of successfully cheating
 
 Slower relays can cheat more easily but the amount of extra weight they can
