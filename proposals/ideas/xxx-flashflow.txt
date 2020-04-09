@@ -166,8 +166,9 @@ cells are used to signal to the other party that there has been some sort of
 problem and that the measurement should be aborted. These cell types are
 described in more detail in the next section.
 
-The only cell type that is sometimes encrypted is MSM_ECHO; all other types
-are never encrypted.
+The only cell type that sometimes undergoes cell encryption is MSM_ECHO; no
+other type ever gets cell encrypted. (All cells are transmitted on a regular
+TLS-wrapped OR connection; that encryption still exists.)
 
 The relay "decrypts" MSM_ECHO cells before sending them back to the measurer; this
 mirrors the way relays decrypt/encrypt RELAY_DATA cells in order to induce
