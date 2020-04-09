@@ -615,7 +615,7 @@ immediately closes the connection after that.  A FF coordinator cannot
 convince a relay to enter measurement mode unless the relay trusts its TLS
 certificate.
 
-A trusted coordinator specifies in the MSM_PARAMS the IP addresses of the
+A trusted coordinator specifies in the MSM_PARAMS cell the IP addresses of the
 measurers the relay shall expect to connect to it shortly. The target adds the
 measurer IP addresses to a whitelist in the DoS connection limit system,
 exempting them from any configured connection limit.  If a measurer is behind
