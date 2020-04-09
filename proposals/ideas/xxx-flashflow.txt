@@ -89,7 +89,7 @@ The primary additions/changes that entirely reside within tor on the relay
 side:
 
   - New torrc options/consensus parameters.
-  - New cell types.
+  - New cell commands.
   - Pre-measurement handshaking (with a simplified authentication scheme).
   - Measurement mode, during which the relay will echo traffic with measurers,
     set a cap on the amount of background traffic it transfers, and report the
@@ -163,11 +163,11 @@ MSM_ECHO cells are the measurement traffic; the measurer generates them, sends
 them to the target, and the target echos them back. The target send a MSM_BG cell
 once per second to report the amount of background traffic it is handling. MSM_ERR
 cells are used to signal to the other party that there has been some sort of
-problem and that the measurement should be aborted. These cell types are
+problem and that the measurement should be aborted. These measure commands are
 described in more detail in the next section.
 
-The only cell type that sometimes undergoes cell encryption is MSM_ECHO; no
-other type ever gets cell encrypted. (All cells are transmitted on a regular
+The only cell that sometimes undergoes cell encryption is MSM_ECHO; no
+other cell ever gets cell encrypted. (All cells are transmitted on a regular
 TLS-wrapped OR connection; that encryption still exists.)
 
 The relay "decrypts" MSM_ECHO cells before sending them back to the measurer; this
@@ -214,7 +214,7 @@ the duration, in seconds, that the actual measurement will last.
 num_measurers is how many measurer_info structs follow.  For each measurer,
 the ipv4_addr it will use when connecting to the target is provided, as is
 num_conns, the number of TCP connections that measurer will open with the
-target.  Future versions of FlashFlow and this cell type will use TLS
+target.  Future versions of FlashFlow and MSM_PARAMS will use TLS
 certificates instead of IP addresses.
 
 MSM_PARAMS_OK has no payload: it's just padding bytes to make the cell 514
