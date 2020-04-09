@@ -306,10 +306,31 @@ client mode.
 The coordinator has the following functions, which will be described in this
 section:
 
+  - result aggregation.
   - schedule measurements.
   - v3bw file generation.
 
-3.2.1.1 Measurement Schedule
+3.2.1.1 Aggregating Results
+
+Every second during a measurement, the measurers send the amount of verified
+measurement traffic they have received back from the relay. Additionally, the
+relay sends a MSM_BG cell each second to the coordinator with amount of
+non-measurement background traffic it is sending and receiving.
+
+For each second's reports, the coordinator sums the measurer's reports.  The
+coordinator takes the minimum of the relay's reported sent and received
+background traffic. If, when compared to the measurer's reports for this
+second, the relay's claimed background traffic is more than what's allowed by
+the background/measurement traffic ratio, then the coordinator further clamps
+the relay's report down. The coordinator adds this final adjusted amount of
+background traffic to the sum of the measurer's reports.
+
+Once the coordinator has done the above for each second in the measurement
+(e.g. 30 times for a 30 second measurement), the coordinator takes the median
+of the 30 per-second throughputs and records it as the estimated capacity of
+the target relay.
+
+3.2.1.2 Measurement Schedule
 
 The short term implementation of measurement scheduling will be simpler than
 the long term one due to (1) there only being one FlashFlow deployment, and
@@ -337,7 +358,7 @@ percentile capacity of the current network.
 If a relay is not online when it's scheduled to be measured, it doesn't get
 measured that day.
 
-3.2.1.1.1 Example
+3.2.1.2.1 Example
 
 Assume the FF deployment has 1 Gbit/s of measurer capacity.  Assume the chosen
 multiplier m=2. Assume there are only 5 slots in a measurement period.
@@ -389,7 +410,7 @@ that order.
     250  |       |  300  |  500  |  100
          |       |  200  |       |   50
 
-3.2.1.2 Generating V3BW files
+3.2.1.3 Generating V3BW files
 
 Every hour the FF coordinator produces a v3bw file in which it stores the
 latest capacity estimate for every relay it has measured in the last week. The
