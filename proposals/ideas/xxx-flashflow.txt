@@ -70,7 +70,8 @@ files to improve load balancing. Two examples: (1) using FF v3bw files instead
 of sbws's (and eventually phasing out torflow/sbws), and (2) continuing to run
 sbws but use FF's results as a better estimate of relay capacity than observed
 bandwidth. Authentication and other FlashFlow features necessary to make it
-completely ready for full production deployment will be worked on here.
+completely ready for full production deployment will be worked on during this
+long term phase.
 
 3. FlashFlow measurement system: Short term
 
@@ -105,7 +106,7 @@ measurements. Even if all other settings would allow a measurement, if this is
 turned off, then no measurement is allowed. Possible values: 0, 1. Default: 0
 (disallowed).
 
-FFAllowedCoordinators: The list of coordinator TLS certificates that are
+FFAllowedCoordinators: The list of coordinator TLS certificate fingerprints that are
 allowed to start measurements. Relays check their torrc when they receive a
 connection from a FlashFlow coordinator to see if it's on the list. If they
 have no list, they check the consensus parameter. If nether exist, then no
@@ -193,7 +194,9 @@ subsystem until the measurement ends (successfully or otherwise).
 Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
 the measurers to open their TCP connections with the target. If the
 coordinator or any measurer receives a MSM_ERR, it reports the error to the
-coordinator and considers the measurement a failure.
+coordinator and considers the measurement a failure. It is also a failure if
+any measurer is unable to open at least half of its TCP connections with the
+target.
 
 The payload of MSM_PARAMS cells [XXX more may need to be added]:
 
