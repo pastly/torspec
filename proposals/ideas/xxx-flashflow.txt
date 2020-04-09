@@ -231,7 +231,8 @@ The payload of MSM_BG cells:
   - recv_bg_bytes [4 bytes]
 
 second is the number of seconds since the measurement began. MSM_BG cells are
-sent once per second. The first cell will have this set to 1, and each
+sent once per second from the relay to the FlashFlow coordinator.
+The first cell will have this set to 1, and each
 subsequent cell will increment it by one. sent_bg_bytes is the number of
 background traffic bytes sent in the last second (since the last MSM_BG cell).
 recv_bg_bytes is the same but for received bytes.
