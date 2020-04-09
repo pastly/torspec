@@ -190,7 +190,8 @@ otherwise it sends a MSM_ERR and closes the connection.
 
 Upon learning the IP addresses of the measurers from the coordinator in the
 MSM_PARAMS cell, the target whitelists their IPs in its DoS detection
-subsystem until the measurement ends (successfully or otherwise).
+subsystem until the measurement ends (successfully or otherwise), at which
+point the whitelist is cleared.
 
 Upon receiving a MSM_PARAMS_OK from the target, the coordinator will instruct
 the measurers to open their TCP connections with the target. If the
@@ -599,7 +600,7 @@ exempting them from any configured connection limit.  If a measurer is behind
 a NAT, an adversary behind the same NAT can DoS the relay's available sockets
 until the end of the measurement. The adversary could also pretend to be the
 measurer. Such an adversary could induce measurement failures and
-inaccuracies.
+inaccuracies. (Note: the whitelist is cleared after the measurement is over.)
 
 4. FlashFlow measurement system: Medium term
 
