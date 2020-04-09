@@ -160,7 +160,7 @@ cells are sent from the relay to the measurer/coordinator.
 MSM_PARAMS and MSM_PARAMS_OK are used during the pre-measurement stage to tell the
 target what to expect and for the relay to positively acknowledge the message.
 MSM_ECHO cells are the measurement traffic; the measurer generates them, sends
-them to the target, and the target echos them back. The target send a MSM_BG cells
+them to the target, and the target echos them back. The target send a MSM_BG cell
 once per second to report the amount of background traffic it is handling. MSM_ERR
 cells are used to signal to the other party that there has been some sort of
 problem and that the measurement should be aborted. These cell types are
