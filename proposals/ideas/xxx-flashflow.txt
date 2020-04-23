@@ -19,7 +19,8 @@ A measurement consists of the following steps:
      target relay and verify that the cells echoed back match the ones
      sent. During this time the relay caps the amount of background
      traffic it transfers. Background and measurement traffic are
-     handled separately at the relay.
+     handled separately at the relay. Measurement traffic counts towards
+     all the standard existing relay statistics.
   4. For every second during the measurement, the measurement nodes
      report to the authority node how much traffic was echoed back. The
      target relay also reports the amount of per-second background
@@ -34,6 +35,13 @@ capacity estimates in the form of a v3bw file, which is suitable for
 direct consumption by a Tor directory authority. Alternatively an
 existing load balancing system such as Simple Bandwidth Scanner could be
 modified to use FlashFlow's v3bw file as input.
+
+It is envisioned that each directory authority that wants to use
+FlashFlow will run their own FlashFlow deployment consisting of a
+coordinator that they run and one or more measurers that they trust
+(e.g. because they run them themselves), similar to how each runs their
+own Torflow/sbws. Section 5.2 of this proposal describes long term plans
+involving multiple FlashFlow deployments.
 
 FlashFlow is more performant than Torflow: FlashFlow takes 5 hours to
 measure the entire existing Tor network from scratch (with 3 Gbit/s
@@ -692,10 +700,11 @@ instead of IP addresses, and relays will update to expect this change.
 5.2 Measurement Scheduling
 
 Short term deployment only has one FF deployment running. Long term this
-may no longer be the case. FF deployments will need to coordinate
-between themselves to not measure the same relay at the same time, and
-to handle new relays as they join during the middle of a measurement
-period (during the day).
+may no longer be the case because, for example, more than one directory
+authority decides to adopt it and they each want to run their own
+deployment. FF deployments will need to coordinate between themselves
+to not measure the same relay at the same time, and to handle new relays
+as they join during the middle of a measurement period (during the day).
 
 The following is quoted from Section 4.3 of the FlashFlow paper.
 
